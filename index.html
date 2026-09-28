@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>거래처 주문 레이더</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -89,8 +94,9 @@ tr.click:hover td{background:var(--surface-2)}
 .hbar .t{height:14px;background:var(--surface-2);border-radius:3px;overflow:hidden}
 .hbar .t b{display:block;height:100%;background:var(--bar);border-radius:0 3px 3px 0}
 .hbar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vbars-wrap{overflow-x:auto}
 .vbars{display:flex;align-items:flex-end;gap:4px;height:160px;padding-top:10px}
-.vbars .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.vbars .col{flex:1 1 0;min-width:34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
 .vbars .bar{width:70%;background:var(--bar);border-radius:3px 3px 0 0;min-height:1px}
 .vbars .lbl{font-size:10.5px;color:var(--muted);margin-top:4px;white-space:nowrap}
 .vbars .val{font-size:10px;color:var(--muted);margin-bottom:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -151,7 +157,22 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 .authcard .switch{margin-top:16px;font-size:12.5px;text-align:center;color:var(--ink-2)}
 .hide{display:none !important}
 .spin{color:var(--muted);font-size:13px;padding:20px}
+@media (max-width:640px){
+  .hide-sm{display:none}
+  body{padding-inline:12px}
+  .brand h1{font-size:17px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpi{padding:12px}
+  .kpi .v{font-size:17px}
+  nav.tabs button{padding:8px 10px 9px;font-size:12.5px}
+  .drawer{width:100%}
+  .drawer-b{padding:14px 14px calc(32px + env(safe-area-inset-bottom,0px))}
+  .panel{padding:13px}
+  table{font-size:12.5px}
+}
 </style>
+</head>
+<body>
 
 <div id="auth" class="authwrap">
   <div class="authcard">
@@ -400,20 +421,48 @@ function hbars(rows, max){
 }
 function monthBars(rows){
   const max = Math.max(...rows.map(r=>Number(r.amount)||0),1);
-  return `<div class="vbars">${rows.map(r=>{
+  return `<div class="vbars-wrap"><div class="vbars">${rows.map(r=>{
     const amt = Number(r.amount)||0;
     const h = Math.max(2, Math.round(amt/max*140));
     const lbl = r.month.slice(2,7).replace('-','.');
     return `<div class="col" title="${esc(lbl)} · ${won(r.amount)}"><div class="val">${amt?eok(amt):''}</div><div class="bar" style="height:${h}px"></div><div class="lbl">${esc(lbl)}</div></div>`;
-  }).join('')}</div>`;
+  }).join('')}</div></div>`;
 }
 function monthTable(rows){
   if(!rows.length) return '';
   return `<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th class="rowhd">월</th>${rows.map(r=>`<th class="num">${esc(r.month.slice(2,7).replace('-','.'))}</th>`).join('')}</tr></thead><tbody>
     <tr><td class="rowhd">금액</td>${rows.map(r=>`<td class="num">${won(r.amount)}</td>`).join('')}</tr>
-    <tr><td class="rowhd">주문건수</td>${rows.map(r=>`<td class="num">${num(r.order_count)}</td>`).join('')}</tr>
-    <tr><td class="rowhd">거래처수</td>${rows.map(r=>`<td class="num">${num(r.customer_count)}</td>`).join('')}</tr>
   </tbody></table></div>`;
+}
+// ---------------- generic year-range helpers (요약 차트 · 거래처 상세 차트 공용) ----------------
+function monthYears(monthsArr){ return [...new Set((monthsArr||[]).map(m=>m.month.slice(0,4)))]; }
+function monthYearBounds(monthsArr, y){
+  let a=-1,b=-1;
+  (monthsArr||[]).forEach((m,i)=>{ if(m.month.slice(0,4)===y){ if(a<0)a=i; b=i+1; } });
+  return [a,b];
+}
+function monthRangeBounds(monthsArr, range){
+  const n = (monthsArr||[]).length;
+  const years = monthYears(monthsArr);
+  if(range==='recent') return [Math.max(0, n-12), n];
+  if(range==='all' || !years.includes(range)) return [0, n];
+  return monthYearBounds(monthsArr, range);
+}
+function monthRangeChips(monthsArr, range, segId){
+  const years = monthYears(monthsArr);
+  if(years.length<=1) return '';
+  const n = (monthsArr||[]).length;
+  const opts = [['recent','최근 12개월'], ...years.map(y=>[y,y+'년']), ['all',`전체(${n}개월)`]];
+  return `<div class="seg" id="${segId}">${opts.map(([k,label])=>`<button data-yr="${k}" aria-pressed="${range===k}">${label}</button>`).join('')}</div>`;
+}
+// summaryMonths: monthly_order_totals 전체 캐시(전 거래처 공통 타임라인). 요약 차트와 거래처 상세 차트가 함께 씀.
+let summaryMonths = null;
+async function ensureMonthsLoaded(){
+  if(summaryMonths) return summaryMonths;
+  const {data, error} = await sb.from('monthly_order_totals').select('*').order('month', {ascending:true});
+  if(error){ summaryMonths = []; throw error; }
+  summaryMonths = data || [];
+  return summaryMonths;
 }
 function statusHelpBlock(){
   return `<details class="help" style="margin-top:12px"><summary>상태·주기는 이렇게 판정했어요</summary>
@@ -439,44 +488,19 @@ function gotoCustomersByStatus(status){
 }
 
 // ---------------- 요약 ----------------
-let summaryMonths = null; // cached monthly_order_totals rows
 let summaryRange = 'recent';
-
-function summaryYears(){ return [...new Set((summaryMonths||[]).map(m=>m.month.slice(0,4)))]; }
-function summaryYearBounds(y){
-  let a=-1,b=-1;
-  (summaryMonths||[]).forEach((m,i)=>{ if(m.month.slice(0,4)===y){ if(a<0)a=i; b=i+1; } });
-  return [a,b];
-}
-function summaryRangeBounds(range){
-  const n = (summaryMonths||[]).length;
-  const years = summaryYears();
-  if(range==='recent') return [Math.max(0, n-12), n];
-  if(range==='all' || !years.includes(range)) return [0, n];
-  return summaryYearBounds(range);
-}
-function summaryChips(){
-  const years = summaryYears();
-  if(years.length<=1) return '';
-  const n = (summaryMonths||[]).length;
-  const opts = [['recent','최근 12개월'], ...years.map(y=>[y,y+'년']), ['all',`전체(${n}개월)`]];
-  return `<div class="seg" id="summarySeg">${opts.map(([k,label])=>`<button data-yr="${k}" aria-pressed="${summaryRange===k}">${label}</button>`).join('')}</div>`;
-}
 
 async function renderSummaryView(){
   const el = document.getElementById('view-summary');
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
-  if(!summaryMonths){
-    const {data: months, error} = await sb.from('monthly_order_totals').select('*').order('month', {ascending:true});
-    if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
-    summaryMonths = months || [];
-  }
+  try{ await ensureMonthsLoaded(); }
+  catch(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   const totalAmount = CUSTS.reduce((s,c)=>s+(Number(c.total_amount)||0),0);
   const totalOrders = CUSTS.reduce((s,c)=>s+(Number(c.order_count)||0),0);
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
   const byType = {}; CUSTS.forEach(c=>byType[c.ctype||'미분류']=(byType[c.ctype||'미분류']||0)+(Number(c.total_amount)||0));
   const topCust = CUSTS.slice(0,10);
-  const [a,b] = summaryRangeBounds(summaryRange);
+  const [a,b] = monthRangeBounds(summaryMonths, summaryRange);
   const chartRows = summaryMonths.slice(a,b);
   el.innerHTML = `
   <div class="kpis">
@@ -487,7 +511,7 @@ async function renderSummaryView(){
   </div>
   <div class="panel">
     <div class="panel-h"><h2>월별 주문금액</h2><span class="note">${chartRows.length}개월</span></div>
-    ${summaryChips()}
+    ${monthRangeChips(summaryMonths, summaryRange, 'summarySeg')}
     ${chartRows.length? monthBars(chartRows) : '<p class="small muted">데이터가 없습니다.</p>'}
     ${monthTable(chartRows)}
   </div>
@@ -956,40 +980,52 @@ async function openDrawer(custId){
   host.querySelector('.scrim').onclick = close;
   host.querySelector('.x').onclick = close;
 
-  const [{data: orders}, {data: acts}, {data: allOrders}] = await Promise.all([
+  const [{data: orders}, {data: acts}, {data: allOrders}, months] = await Promise.all([
     sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).limit(30),
     sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
-    sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId)
+    sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId),
+    ensureMonthsLoaded().catch(()=>[])
   ]);
   const orderDates = (orders||[]).map(o=>o.order_date);
   const byMonth = new Map();
   (allOrders||[]).forEach(o=>{ if(!o.order_date) return; const m = o.order_date.slice(0,7)+'-01'; byMonth.set(m, (byMonth.get(m)||0)+(Number(o.supply_amount)||0)); });
-  const custChartRows = [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month,amount}));
+  const hasAnyOrders = byMonth.size > 0;
+  const custMonthsAll = (months && months.length)
+    ? months.map(m=>({month: m.month, amount: byMonth.get(m.month)||0}))
+    : [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month,amount}));
+  let custRange = 'recent';
 
   const body = document.getElementById('drawerBody');
   if(!body) return; // drawer already closed
-  body.innerHTML = `
-    <div class="kpis">
-      <div class="kpi"><div class="l">누적매출</div><div class="v">${won(c.total_amount)}</div></div>
-      <div class="kpi"><div class="l">주문수</div><div class="v">${num(c.order_count)}</div></div>
-      <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
-      <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
-    </div>
-    ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
-    <div class="panel">
-      <div class="panel-h"><h3>월별 주문금액</h3></div>
-      ${custChartRows.length? monthBars(custChartRows) : '<p class="small muted">주문 이력이 없습니다.</p>'}
-    </div>
-    <div class="panel">
-      <div class="panel-h"><h3>최근 주문 (${orders?orders.length:0}건)</h3></div>
-      ${(orders||[]).map(o=>`<div class="order">
-        <div class="order-h"><b>${o.order_date}</b> <span class="small muted">${esc(o.item_name||'')}</span> <span class="amt">${won(o.supply_amount)}</span></div>
-        ${o.address?`<div class="ship">${esc(o.address)}</div>`:''}
-      </div>`).join('') || '<p class="small muted">주문 이력이 없습니다.</p>'}
-    </div>
-    <div class="panel" id="logPanel"></div>`;
 
-  renderLogSection(custId, acts||[], orderDates);
+  function drawBody(){
+    const [ra,rb] = monthRangeBounds(custMonthsAll, custRange);
+    const chartRows = custMonthsAll.slice(ra,rb);
+    body.innerHTML = `
+      <div class="kpis">
+        <div class="kpi"><div class="l">누적매출</div><div class="v">${won(c.total_amount)}</div></div>
+        <div class="kpi"><div class="l">주문수</div><div class="v">${num(c.order_count)}</div></div>
+        <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
+        <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
+      </div>
+      ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
+      <div class="panel">
+        <div class="panel-h"><h3>월별 주문금액</h3><span class="note">${chartRows.length}개월</span></div>
+        ${hasAnyOrders ? monthRangeChips(custMonthsAll, custRange, 'custChartSeg') : ''}
+        ${hasAnyOrders ? monthBars(chartRows) : '<p class="small muted">주문 이력이 없습니다.</p>'}
+      </div>
+      <div class="panel">
+        <div class="panel-h"><h3>최근 주문 (${orders?orders.length:0}건)</h3></div>
+        ${(orders||[]).map(o=>`<div class="order">
+          <div class="order-h"><b>${o.order_date}</b> <span class="small muted">${esc(o.item_name||'')}</span> <span class="amt">${won(o.supply_amount)}</span></div>
+          ${o.address?`<div class="ship">${esc(o.address)}</div>`:''}
+        </div>`).join('') || '<p class="small muted">주문 이력이 없습니다.</p>'}
+      </div>
+      <div class="panel" id="logPanel"></div>`;
+    body.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ custRange = b.dataset.yr; drawBody(); });
+    renderLogSection(custId, acts||[], orderDates);
+  }
+  drawBody();
 }
 
 function renderLogSection(custId, acts, orderDates){
@@ -1055,3 +1091,5 @@ function logItemHTML(a, orderDates){
   </div>`;
 }
 </script>
+</body>
+</html>
