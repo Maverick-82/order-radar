@@ -98,6 +98,8 @@ tr.click:hover td{background:var(--surface-2)}
 .grid2 > *{min-width:0}
 .hbars{display:grid;gap:7px}
 .hbar{display:grid;grid-template-columns:minmax(80px,150px) 1fr auto;gap:10px;align-items:center;font-size:13px}
+.hbar.click{cursor:pointer;margin-inline:-6px;padding:3px 6px;border-radius:6px}
+.hbar.click:hover{background:var(--surface-2)}
 .hbar .t{height:14px;background:var(--surface-2);border-radius:3px;overflow:hidden}
 .hbar .t b{display:block;height:100%;background:var(--bar);border-radius:0 3px 3px 0}
 .hbar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -451,7 +453,7 @@ async function loadCustomers(){
 // ---------------- shared chart helpers ----------------
 function hbars(rows, max){
   max = max || Math.max(...rows.map(r=>r.v),1);
-  return `<div class="hbars">${rows.map(r=>`<div class="hbar"><span class="nm" title="${esc(r.n)}">${esc(r.n)}</span><span class="t"><b style="width:${Math.max(0,r.v/max*100).toFixed(1)}%"></b></span><span class="num small">${r.s}</span></div>`).join('')}</div>`;
+  return `<div class="hbars">${rows.map(r=>`<div class="hbar${r.id!=null?' click':''}"${r.id!=null?` data-hb-id="${r.id}"`:''}><span class="nm" title="${esc(r.n)}">${esc(r.n)}</span><span class="t"><b style="width:${Math.max(0,r.v/max*100).toFixed(1)}%"></b></span><span class="num small">${r.s}</span></div>`).join('')}</div>`;
 }
 function monthBars(rows){
   const max = Math.max(...rows.map(r=>Number(r.amount)||0),1);
@@ -564,37 +566,75 @@ function topMergedItems(rows, n){
   });
   return [...byName.values()].sort((a,b)=>b.amount-a.amount).slice(0,n);
 }
+// customer_year_totals: 거래처별 × 연도별 누적매출/주문수 전체 캐시 (요약 탭의 "거래처별" 랭킹에 씀).
+let custYearTotals = null;
+async function ensureCustYearTotalsLoaded(){
+  if(custYearTotals) return custYearTotals;
+  const {data, error} = await sb.from('customer_year_totals').select('*');
+  if(error){ custYearTotals = []; throw error; }
+  custYearTotals = data || [];
+  return custYearTotals;
+}
+// 요약 탭 상단 기간칩(최근12개월/연도/전체)과 거래처 상세창의 기간칩이 같이 쓰는 라벨 함수.
+function rangeLabel(range){
+  if(range==='recent') return '최근 12개월';
+  if(range==='all') return '전체';
+  return range+'년';
+}
 
 // ---------------- 요약 ----------------
 let summaryRange = 'recent';
+let summaryGroupBy = '유형별'; // '유형별' | '거래처별'
+
+// 유형별/거래처별 누적매출 상위 랭킹 계산. 연도(2024/2025/2026)가 선택된 경우엔 그 해 실적만으로,
+// '최근 12개월'·'전체'가 선택된 경우엔 (연도별 집계로는 정확히 재현할 수 없어) 전체 기간 누적으로 계산.
+function summaryByType(range){
+  const yr = ['2024','2025','2026'].includes(range) ? Number(range) : null;
+  const amtByCust = yr!=null ? new Map((custYearTotals||[]).filter(r=>r.year===yr).map(r=>[r.customer_id, Number(r.total_amount)||0])) : null;
+  const byType = {};
+  CUSTS.forEach(c=>{
+    let t = c.ctype || '미분류';
+    if(t==='초등학교' || t==='유치원·어린이집') t = '초등학교·유치원';
+    const amt = yr!=null ? (amtByCust.get(c.customer_id)||0) : (Number(c.total_amount)||0);
+    if(amt>0) byType[t] = (byType[t]||0) + amt;
+  });
+  return byType;
+}
+function summaryTopCustomers(range, n){
+  const yr = ['2024','2025','2026'].includes(range) ? Number(range) : null;
+  if(yr!=null){
+    return (custYearTotals||[]).filter(r=>r.year===yr && Number(r.total_amount)>0)
+      .sort((a,b)=>Number(b.total_amount)-Number(a.total_amount)).slice(0,n)
+      .map(r=>{ const c = custById.get(r.customer_id); return {n:(c&&c.name)||`#${r.customer_id}`, v:Number(r.total_amount)||0, s:won(r.total_amount), id:r.customer_id}; });
+  }
+  return CUSTS.slice().sort((a,b)=>(Number(b.total_amount)||0)-(Number(a.total_amount)||0)).slice(0,n)
+    .map(c=>({n:c.name, v:Number(c.total_amount)||0, s:won(c.total_amount), id:c.customer_id}));
+}
 
 async function renderSummaryView(){
   const el = document.getElementById('view-summary');
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
   let itemRows = [];
   try{
-    const [, items] = await Promise.all([ensureMonthsLoaded(), ensureItemTotalsLoaded()]);
+    const [, items] = await Promise.all([ensureMonthsLoaded(), ensureItemTotalsLoaded(), ensureCustYearTotalsLoaded()]);
     itemRows = items;
   }
   catch(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
-  const totalAmount = CUSTS.reduce((s,c)=>s+(Number(c.total_amount)||0),0);
-  const totalOrders = CUSTS.reduce((s,c)=>s+(Number(c.order_count)||0),0);
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
-  // 유형별 누적매출 상위에서는 초등학교와 유치원·어린이집을 한 줄로 합쳐서 보여줌
-  const byType = {};
-  CUSTS.forEach(c=>{
-    let t = c.ctype || '미분류';
-    if(t==='초등학교' || t==='유치원·어린이집') t = '초등학교·유치원';
-    byType[t] = (byType[t]||0) + (Number(c.total_amount)||0);
-  });
   const topItems = topMergedItems(itemRows, 40);
   const [a,b] = monthRangeBounds(summaryMonths, summaryRange);
   const chartRows = summaryMonths.slice(a,b);
+  // KPI의 "주문금액"·"주문"은 선택한 기간(최근12개월/연도/전체) 동안의 실적으로 계산 — monthly_order_totals가
+  // 이미 월별 금액·건수를 갖고 있어서, 그 기간에 해당하는 월들만 더하면 됨.
+  const rangeAmount = chartRows.reduce((s,r)=>s+(Number(r.amount)||0),0);
+  const rangeOrders = chartRows.reduce((s,r)=>s+(Number(r.order_count)||0),0);
+  const byType = summaryByType(summaryRange);
+  const topCustomers = summaryTopCustomers(summaryRange, 10);
   el.innerHTML = `
   <div class="kpis">
-    <div class="kpi"><div class="l">누적 주문금액</div><div class="v">${won(totalAmount)}</div></div>
+    <div class="kpi"><div class="l">주문금액 (${rangeLabel(summaryRange)})</div><div class="v">${won(rangeAmount)}</div></div>
     <div class="kpi"><div class="l">거래처</div><div class="v">${num(CUSTS.length)}곳</div></div>
-    <div class="kpi"><div class="l">주문 (누적)</div><div class="v">${num(totalOrders)}건</div></div>
+    <div class="kpi"><div class="l">주문 (${rangeLabel(summaryRange)})</div><div class="v">${num(rangeOrders)}건</div></div>
     <div class="kpi"><div class="l">주문 늦어진 거래처</div><div class="v" style="color:var(--bad)">${num((byStatus['이탈의심']||0)+(byStatus['주의']||0))}곳</div><div class="s">이탈의심 ${byStatus['이탈의심']||0} · 주의 ${byStatus['주의']||0}</div></div>
   </div>
   <div class="panel">
@@ -607,14 +647,25 @@ async function renderSummaryView(){
     <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<button class="chip" data-goto-st="${esc(k)}">${statusPill(k)} ${v}곳</button>`).join('')}</div>
     ${statusHelpBlock()}
   </div>
-  <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
-    ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
+  <div class="panel"><div class="panel-h"><h2>${esc(summaryGroupBy)} 누적매출 상위</h2>
+    <div class="seg" id="summaryGroupSeg">
+      <button data-g="유형별" aria-pressed="${summaryGroupBy==='유형별'}">유형별</button>
+      <button data-g="거래처별" aria-pressed="${summaryGroupBy==='거래처별'}">거래처별</button>
+    </div></div>
+    <span class="note">${rangeLabel(summaryRange)} 기준${summaryGroupBy==='거래처별'?' · 클릭하면 거래처 상세로 이동':''}</span>
+    ${summaryGroupBy==='유형별'
+      ? hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))
+      : hbars(topCustomers)}
+  </div>
   <div class="panel"><div class="panel-h"><h2>주요 품목</h2><span class="note">누적금액 상위 · 특가·공동구매 등 표기만 다른 동일 품목은 합산</span></div>
     <div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>품목</th><th class="num">누적금액</th><th class="num">수량</th></tr></thead><tbody>
     ${topItems.map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   el.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ summaryRange = b.dataset.yr; renderSummaryView(); });
   el.querySelectorAll('[data-goto-st]').forEach(b=> b.onclick = ()=> gotoCustomersByStatus(b.dataset.gotoSt) );
+  const gseg = document.getElementById('summaryGroupSeg');
+  if(gseg) gseg.onclick = (e)=>{ const b=e.target.closest('button[data-g]'); if(!b) return; summaryGroupBy = b.dataset.g; renderSummaryView(); };
+  el.querySelectorAll('[data-hb-id]').forEach(b=> b.onclick = ()=> openDrawer(Number(b.dataset.hbId)) );
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
@@ -1223,18 +1274,25 @@ async function openDrawer(custId){
   const [{data: orders}, {data: acts}, {data: allOrders}, months, {data: itemStats}, {data: recoRows}] = await Promise.all([
     sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).order('order_no', {ascending:false}).limit(150),
     sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
-    sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId),
+    sb.from('orders').select('order_date,supply_amount,order_no').eq('customer_id', custId),
     ensureMonthsLoaded().catch(()=>[]),
     sb.from('item_customer_stats').select('*').eq('customer_id', custId).then(r=>r, ()=>({data:[]})),
     c.ctype ? sb.from('item_type_penetration').select('*').eq('ctype', c.ctype).order('penetration_pct', {ascending:false}).limit(30).then(r=>r, ()=>({data:[]})) : Promise.resolve({data:[]})
   ]);
   const orderDates = (orders||[]).map(o=>o.order_date);
   const byMonth = new Map();
-  (allOrders||[]).forEach(o=>{ if(!o.order_date) return; const m = o.order_date.slice(0,7)+'-01'; byMonth.set(m, (byMonth.get(m)||0)+(Number(o.supply_amount)||0)); });
+  const orderKeysByMonth = new Map(); // 월별 실제 "주문 건수"(날짜+주문번호 조합) 집계 — 기간별 주문수 KPI에 씀
+  (allOrders||[]).forEach(o=>{
+    if(!o.order_date) return;
+    const m = o.order_date.slice(0,7)+'-01';
+    byMonth.set(m, (byMonth.get(m)||0)+(Number(o.supply_amount)||0));
+    if(!orderKeysByMonth.has(m)) orderKeysByMonth.set(m, new Set());
+    orderKeysByMonth.get(m).add(o.order_date+'_'+o.order_no);
+  });
   const hasAnyOrders = byMonth.size > 0;
   const custMonthsAll = (months && months.length)
-    ? months.map(m=>({month: m.month, amount: byMonth.get(m.month)||0}))
-    : [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month,amount}));
+    ? months.map(m=>({month: m.month, amount: byMonth.get(m.month)||0, orders:(orderKeysByMonth.get(m.month)||new Set()).size}))
+    : [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month, amount, orders:(orderKeysByMonth.get(month)||new Set()).size}));
   let custRange = 'recent';
   // 주문(orders) 테이블은 한 줄이 "한 주문의 품목 하나"라서, 같은 날짜·같은 주문번호(order_no)끼리
   // 묶어야 실제 "주문 1건"이 됨 — 최근 주문 목록은 이 묶음 단위로 보여주고, 클릭하면 그 주문에 속한
@@ -1304,10 +1362,13 @@ async function openDrawer(custId){
   function drawBody(){
     const [ra,rb] = monthRangeBounds(custMonthsAll, custRange);
     const chartRows = custMonthsAll.slice(ra,rb);
+    // 누적매출·주문수도 아래 "월별 주문금액" 기간칩(최근12개월/연도/전체)에 맞춰 그 기간 실적으로 보여줌.
+    const rangeAmount = hasAnyOrders ? chartRows.reduce((s,r)=>s+(Number(r.amount)||0),0) : (c.total_amount||0);
+    const rangeOrders = hasAnyOrders ? chartRows.reduce((s,r)=>s+(Number(r.orders)||0),0) : (c.order_count||0);
     body.innerHTML = `
       <div class="kpis">
-        <div class="kpi"><div class="l">누적매출</div><div class="v">${won(c.total_amount)}</div></div>
-        <div class="kpi"><div class="l">주문수</div><div class="v">${num(c.order_count)}</div></div>
+        <div class="kpi"><div class="l">누적매출 (${rangeLabel(custRange)})</div><div class="v">${won(rangeAmount)}</div></div>
+        <div class="kpi"><div class="l">주문수 (${rangeLabel(custRange)})</div><div class="v">${num(rangeOrders)}</div></div>
         <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
         <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
       </div>
