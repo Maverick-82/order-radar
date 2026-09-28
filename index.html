@@ -482,6 +482,11 @@ function statusHelpBlock(){
   <dt>학교 주의점</dt><dd>학교는 방학(7~8월)·예산 시기 때문에 주문이 끊겨 보일 수 있어요. 이탈의심은 '연락해볼 후보'로 보세요.</dd>
   </dl></details>`;
 }
+// 영업 탭 하위 패널들에서 공통으로 쓰는 "기준 자세히 보기" 접이식 블록.
+// statusHelpBlock()과 같은 모양(요약 탭)을 그대로 따라서, 팀원이 어디서든 같은 방식으로 기준을 확인할 수 있게 함.
+function critHelp(summary, dlHtml){
+  return `<details class="help" style="margin-top:10px"><summary>${esc(summary)}</summary><dl class="defs">${dlHtml}</dl></details>`;
+}
 function gotoCustomersByStatus(status){
   custStatusFilter = status;
   currentTab = 'customers';
@@ -603,6 +608,15 @@ async function renderForecastView(){
     <div class="panel-h"><h2>곧 재주문할 것으로 보이는 곳</h2>
       <div class="seg">${[14,30,60].map(w=>`<button data-w="${w}" aria-pressed="${w===forecastWindow}">${w}일 이내</button>`).join('')}</div></div>
     <p class="explain">품목별로 3번 이상 주기적으로 산 이력이 있으면 <b>평소 주문 간격</b>으로 다음 주문일을 예상했어요. 재고 준비나 먼저 연락하는 데 쓰세요. '지연'은 예상일이 조금 지난 곳이에요 — 오래 지난 곳은 영업 탭의 '품목 끊김'에서 볼 수 있어요.</p>
+    ${critHelp('예상일·상태는 이렇게 계산했어요', `
+      <dt>대상 품목</dt><dd>같은 거래처가 같은 품목을 3번 이상 주문한 경우만 — 1~2번만 산 품목은 주기를 알 수 없어 제외</dd>
+      <dt>예상일</dt><dd>그 품목 주문 날짜들 사이 간격의 중앙값(평소 주기)을 마지막 주문일에 더해서 계산</dd>
+      <dt>${statusPill('정상')}</dt><dd>예상일까지 15일 이상 남음</dd>
+      <dt>${statusPill('임박')}</dt><dd>예상일이 14일 이내로 다가옴</dd>
+      <dt>${statusPill('지연')}</dt><dd>경과일이 평소주기×1.5(또는 20일 중 큰 값)를 넘어 예상일이 이미 지남</dd>
+      <dt>끊김의심 제외</dt><dd>경과일이 평소주기×3(또는 75일 중 큰 값)을 넘으면 '품목 끊김' 쪽으로 분류돼 이 목록엔 안 나와요</dd>
+      <dt>표시 범위</dt><dd>오늘 기준 −21일 ~ 선택한 기간(14/30/60일) 이내로 예상되는 것만</dd>
+    `)}
     <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건 예상</div>
     <div class="tbl-wrap"><table><thead><tr><th class="num">예상일</th><th>거래처</th><th>품목</th><th class="num">보통수량</th><th class="num">주기</th><th class="num hide-sm">마지막 주문</th><th>상태</th></tr></thead><tbody>
     ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td class="num">${r.next_date}</td><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${num(r.usual_qty)}</td><td class="num">${r.cycle_days}일</td><td class="num hide-sm">${r.last_date}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
@@ -788,6 +802,13 @@ async function renderItemStop(){
   body.innerHTML = `<div class="panel">
     <div class="panel-h"><h2>거래는 계속되는데 특정 품목만 끊긴 곳</h2></div>
     <p class="explain">거래처는 여전히 주문 중인데(상태: 활성·신규), 전에는 주기적으로 사던 품목을 한동안 안 사고 있어요. <b>다른 업체에서 사고 있을 가능성</b>이 있어 확인이 필요한 곳이에요.</p>
+    ${critHelp('대상은 이렇게 골랐어요', `
+      <dt>대상 거래처</dt><dd>거래처 자체는 여전히 활성 또는 신규 상태 — 다른 품목은 계속 주문 중인 곳만</dd>
+      <dt>대상 품목</dt><dd>그 거래처가 3번 이상 주기적으로 산 적 있는 품목 중에서만 판단 (1~2번만 산 품목은 제외)</dd>
+      <dt>${statusPill('지연')}</dt><dd>경과일이 평소주기×1.5(또는 20일 중 큰 값)를 넘음 — 슬슬 확인해볼 단계</dd>
+      <dt>${statusPill('끊김의심')}</dt><dd>경과일이 평소주기×3(또는 75일 중 큰 값)을 넘음 — 다른 곳에서 사고 있을 가능성이 큰 단계</dd>
+      <dt>정렬</dt><dd>그 품목의 누적 구매금액이 큰 순</dd>
+    `)}
     <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건</div>
     <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>품목</th><th class="num">이전 주기</th><th class="num">마지막 구매</th><th class="num">누적 금액</th><th>상태</th></tr></thead><tbody>
     ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${r.cycle_days}일 (${r.order_count}회)</td><td class="num">${r.last_date}<div class="small muted">${r.since_days}일 전</div></td><td class="num">${won(r.total_amount)}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
@@ -817,6 +838,13 @@ async function renderReco(){
   body.innerHTML = `<div class="panel">
     <div class="panel-h"><h2>추가구매 추천</h2></div>
     <p class="explain">같은 유형 기관이 많이 사는데 <b>이 거래처는 아직 우리에게 안 산 품목</b>이에요. '동종 구매율'은 같은 유형 거래처 중 그 품목을 산 비율입니다. 매출이 큰 거래처부터, 현재 거래 중인 곳만 보여줍니다.</p>
+    ${critHelp('추천은 이렇게 골랐어요', `
+      <dt>대상 거래처</dt><dd>상태가 이탈의심·휴면·일회성이 아닌 곳(활성·신규·주의) 중 누적매출 상위 150곳</dd>
+      <dt>추천 품목</dt><dd>같은 기관유형(예: 초등학교, 구청) 안에서 그 거래처가 3번 이상 산 적은 없는 품목</dd>
+      <dt>동종 구매율</dt><dd>같은 기관유형 거래처 중 그 품목을 산 적 있는 곳의 비율(%)</dd>
+      <dt>표본 기준</dt><dd>같은 기관유형이 8곳 이상이고, 그 품목을 산 곳이 3곳 이상일 때만 계산 — 표본이 적으면 통계가 부정확해서 제외</dd>
+      <dt>정렬</dt><dd>거래처는 누적매출 큰 순, 추천 품목은 그 안에서 구매율 높은 순 최대 3개</dd>
+    `)}
     <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}곳</div>
     <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th class="num">누적 금액</th><th>추천 1순위</th><th>추천 2순위</th><th class="hide-sm">추천 3순위</th></tr></thead><tbody>
     ${rows.map(r=>{ const cell = x => x?`<b>${esc(x.item_name)}</b><div class="small muted">동종 ${x.penetration_pct}%</div>`:''; return `<tr class="click" data-id="${r.c.customer_id}"><td>${esc(r.c.name)} <span class="tag">${esc(r.c.ctype||'')}</span></td><td class="num">${won(r.c.total_amount)}</td><td>${cell(r.opts[0])}</td><td>${cell(r.opts[1])}</td><td class="hide-sm">${cell(r.opts[2])}</td></tr>`; }).join('')}
@@ -900,6 +928,14 @@ function renderPriority(){
       <label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="onlyTiming" ${priorityOnlyTiming?'checked':''}> 지금 타이밍 좋은 곳만</label>
       <button class="btn" id="pcopy">목록 복사</button></div></div>
     <p class="explain">상태(이탈의심·주의·휴면·일회성) · 얼마나 늦어졌는지 · 누적 금액 · 기관유형별 연락 타이밍을 종합해서 <b>오늘 먼저 연락해볼 만한 순서</b>로 매겼어요. 학교는 방학 끝난 직후(3월·9월), 공공기관은 예산 집행 초반과 연말 소진기를 '타이밍 좋음'으로 봤어요.</p>
+    ${critHelp('점수는 이렇게 계산했어요', `
+      <dt>대상</dt><dd>상태가 주의·이탈의심·휴면·일회성인 거래처만 (활성·신규는 급하지 않아 제외)</dd>
+      <dt>상태 위험도</dt><dd>이탈의심 ×3.0 · 주의 ×2.0 · 휴면 ×1.3 · 일회성 ×0.8 — 가장 크게 반영되는 요소예요</dd>
+      <dt>금액 규모</dt><dd>누적매출을 로그스케일로 반영해요 (log10(누적매출+1만원)) — 매출 큰 곳으로만 쏠리지 않도록 완만하게만 반영</dd>
+      <dt>지연 정도</dt><dd>경과일 ÷ 평소주기(최대 6배까지만 인정) × 0.15만큼 가산 — 많이 늦어질수록 조금씩 더 올라가요</dd>
+      <dt>연락 타이밍</dt><dd>지금이 그 기관유형의 '연락 좋은 시점'이면 ×1.2 가점 — 학교는 3월·9월, 공공기관은 3~4월·9~12월</dd>
+      <dt>최종 순위</dt><dd>위 네 가지를 모두 곱한 점수가 높은 순으로 최대 40곳</dd>
+    `)}
     <div class="small muted" style="margin:10px 0 6px">상위 ${list.length}곳</div>
     <div class="tbl-wrap"><table>
       <thead><tr><th class="num">순위</th><th>거래처</th><th>상태</th><th>타이밍</th><th class="num">누적매출</th><th class="num">최근주문</th></tr></thead>
@@ -928,6 +964,12 @@ function renderChurn(){
   const list = CUSTS.filter(c=>c.status==='이탈의심').sort((a,b)=>(b.days_since_last_order||0)-(a.days_since_last_order||0)).slice(0,80);
   body.innerHTML = `<div class="panel">
     <div class="panel-h"><h2>이탈 감지</h2><span class="note">이탈의심 상태, 마지막 주문 이후 경과일이 긴 순 (상위 ${list.length}곳)</span></div>
+    <p class="explain">상태가 <b>이탈의심</b>인 거래처만 모았어요 — 주문을 3번 이상 한 이력이 있는데, 마지막 주문 이후 경과일이 평소 주기의 3배와 75일을 둘 다 넘긴 곳이에요. 요약 탭의 상태 판정 기준과 완전히 같습니다.</p>
+    ${critHelp('판정 기준 자세히', `
+      <dt>대상</dt><dd>주문 3회 이상 — 경과일이 평소주기×3(또는 75일 중 큰 값)을 모두 넘긴 거래처</dd>
+      <dt>정렬</dt><dd>마지막 주문 이후 경과일이 긴 순으로 최대 80곳</dd>
+      <dt>학교 주의점</dt><dd>학교는 방학(7~8월) 때문에 일시적으로 끊긴 것처럼 보일 수 있어요 — 개학 시점(3월·9월)도 함께 참고하세요</dd>
+    `)}
     <div class="tbl-wrap"><table>
       <thead><tr><th>거래처</th><th class="num">경과일</th><th class="num">평소주기</th><th class="num">누적매출</th><th class="num">주문수</th></tr></thead>
       <tbody>${list.map(c=>`<tr class="click" data-id="${c.customer_id}">
@@ -1075,6 +1117,42 @@ function salesTipHTML(c){
     <p class="explain">${esc(situation)}<br>💡 ${esc(tip)}</p>
   </div>`;
 }
+// 이 거래처에 한해서, 영업 탭 5개 패널(재주문 예측·이탈 감지·품목 끊김·추가구매 추천)이 쓰는 것과
+// 완전히 같은 기준으로 계산한 품목별 근거를 보여줌 — "거래처별로도 설명이 상세했으면 좋겠다"는
+// 요청에 맞춰, 패널에서 보던 판정을 그 거래처 하나로 좁혀서 구체적인 품목명·날짜·숫자로 보여준다.
+function salesDetailHTML(c, itemStats, recoRows){
+  const stats = itemStats || [];
+  const stopped = stats.filter(r=>r.status==='끊김의심').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0));
+  const delayed = stats.filter(r=>r.status==='지연').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0));
+  const upcoming = stats.filter(r=>r.status==='임박').sort((a,b)=> (a.next_date<b.next_date?-1:1));
+  const have = new Set(stats.map(r=>r.item_name));
+  const recos = (recoRows||[]).filter(r=>!have.has(r.item_name)).slice(0,3);
+
+  const li = (arr, fmt) => arr.slice(0,5).map(r=>`<li>${fmt(r)}</li>`).join('');
+  const sections = [];
+  if(stopped.length){
+    sections.push(`<div style="margin-top:10px"><b class="small">🔴 끊긴 것으로 보이는 품목 (${stopped.length}개)</b>
+      <div class="small muted">평소 주기의 3배(또는 75일) 넘게 안 산 품목 — 다른 곳에서 사고 있을 가능성</div>
+      <ul class="small" style="margin:6px 0 0 18px">${li(stopped, r=>`${esc(r.item_name)} — 평소 ${r.cycle_days}일 주기인데 ${r.since_days}일째 없음 (누적 ${won(r.total_amount)})`)}</ul></div>`);
+  }
+  if(delayed.length){
+    sections.push(`<div style="margin-top:10px"><b class="small">🟡 늦어지고 있는 품목 (${delayed.length}개)</b>
+      <ul class="small" style="margin:6px 0 0 18px">${li(delayed, r=>`${esc(r.item_name)} — 예상일 ${r.next_date}보다 늦어지는 중 (평소 ${r.cycle_days}일 주기)`)}</ul></div>`);
+  }
+  if(upcoming.length){
+    sections.push(`<div style="margin-top:10px"><b class="small">🟢 곧 재주문할 것으로 보이는 품목 (${upcoming.length}개)</b>
+      <ul class="small" style="margin:6px 0 0 18px">${li(upcoming, r=>`${esc(r.item_name)} — 예상일 ${r.next_date}${r.usual_qty?` (보통 ${num(r.usual_qty)}개)`:''}`)}</ul></div>`);
+  }
+  if(recos.length){
+    sections.push(`<div style="margin-top:10px"><b class="small">💡 같은 유형 기관이 많이 사는 미구매 품목</b>
+      <ul class="small" style="margin:6px 0 0 18px">${recos.map(r=>`<li>${esc(r.item_name)} — 동종(${esc(c.ctype||'')}) 구매율 ${r.penetration_pct}%</li>`).join('')}</ul></div>`);
+  }
+  if(!sections.length) return '';
+  return `<div class="panel">
+    <div class="panel-h"><h3>이 거래처의 품목별 근거</h3><span class="note">영업 탭 각 패널과 같은 기준</span></div>
+    ${sections.join('')}
+  </div>`;
+}
 
 async function openDrawer(custId){
   const c = custById.get(custId);
@@ -1095,11 +1173,13 @@ async function openDrawer(custId){
   host.querySelector('.scrim').onclick = close;
   host.querySelector('.x').onclick = close;
 
-  const [{data: orders}, {data: acts}, {data: allOrders}, months] = await Promise.all([
+  const [{data: orders}, {data: acts}, {data: allOrders}, months, {data: itemStats}, {data: recoRows}] = await Promise.all([
     sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).limit(30),
     sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
     sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId),
-    ensureMonthsLoaded().catch(()=>[])
+    ensureMonthsLoaded().catch(()=>[]),
+    sb.from('item_customer_stats').select('*').eq('customer_id', custId).then(r=>r, ()=>({data:[]})),
+    c.ctype ? sb.from('item_type_penetration').select('*').eq('ctype', c.ctype).order('penetration_pct', {ascending:false}).limit(30).then(r=>r, ()=>({data:[]})) : Promise.resolve({data:[]})
   ]);
   const orderDates = (orders||[]).map(o=>o.order_date);
   const byMonth = new Map();
@@ -1124,6 +1204,7 @@ async function openDrawer(custId){
         <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
       </div>
       ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
+      ${salesDetailHTML(c, itemStats, recoRows)}
       <div class="panel">
         <div class="panel-h"><h3>월별 주문금액</h3><span class="note">${chartRows.length}개월</span></div>
         ${hasAnyOrders ? monthRangeChips(custMonthsAll, custRange, 'custChartSeg') : ''}
