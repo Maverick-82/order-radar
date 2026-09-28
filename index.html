@@ -1,0 +1,651 @@
+<title>거래처 주문 레이더</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+:root{
+  --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f4; --ink:#131820; --ink-2:#434b58; --muted:#737d8b; --line:#e1e5ea; --line-2:#cfd5dd;
+  --accent:#2a78d6; --accent-ink:#1c5cab; --accent-soft:#e2edfa;
+  --good:#1d7f47; --good-soft:#dff1e6; --warn:#a66300; --warn-soft:#fbeed6; --bad:#c23636; --bad-soft:#fbe3e3; --idle:#667085; --idle-soft:#eceef2;
+  --bar:#2a78d6; --bar-muted:#b7d3f6; --shadow:0 8px 30px rgba(20,30,50,.14);
+  --font:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
+  --bg:#0f1216; --surface:#171b21; --surface-2:#1f242c; --ink:#eef1f5; --ink-2:#c3cad4; --muted:#8e98a5; --line:#2a3039; --line-2:#3a424d;
+  --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#182a41;
+  --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
+  --bar:#3987e5; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; } }
+:root[data-theme="dark"]{
+  --bg:#0f1216; --surface:#171b21; --surface-2:#1f242c; --ink:#eef1f5; --ink-2:#c3cad4; --muted:#8e98a5; --line:#2a3039; --line-2:#3a424d;
+  --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#182a41;
+  --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
+  --bar:#3987e5; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;margin:0;padding-inline:16px;padding-block:0 48px}
+.wrap{max-width:1280px;margin:0 auto}
+header.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);margin-inline:-16px;padding:14px 16px 0;border-bottom:1px solid var(--line)}
+.brand{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;max-width:1280px;margin:0 auto;justify-content:space-between}
+.brand h1{font-size:19px;font-weight:700;margin:0;letter-spacing:-.01em}
+.brand .sub{color:var(--muted);font-size:12.5px}
+.whoami{display:flex;align-items:center;gap:10px;font-size:12.5px;color:var(--ink-2)}
+.whoami .role{font-size:11px;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:1px 8px}
+nav.tabs{display:flex;gap:2px;overflow-x:auto;max-width:1280px;margin:10px auto 0;scrollbar-width:none}
+nav.tabs::-webkit-scrollbar{display:none}
+nav.tabs button{flex:none;border:0;background:none;font:inherit;color:var(--ink-2);padding:9px 12px 10px;border-bottom:2px solid transparent;cursor:pointer;font-weight:500;white-space:nowrap}
+nav.tabs button:hover{color:var(--ink)}
+nav.tabs button[aria-selected="true"]{color:var(--accent-ink);border-bottom-color:var(--accent);font-weight:600}
+button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.view{padding-top:18px;display:grid;gap:18px}
+section.view > *{min-width:0}
+h2{font-size:16px;margin:0;font-weight:600}
+h3{font-size:14px;margin:0;font-weight:600}
+.lede{color:var(--ink-2);margin:0;max-width:75ch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.panel-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-bottom:12px}
+.panel-h .note{color:var(--muted);font-size:12px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.kpi{background:var(--surface);padding:14px 16px}
+.kpi .l{font-size:12px;color:var(--muted);letter-spacing:.02em}
+.kpi .v{font-size:20px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:2px}
+.kpi .s{font-size:12px;color:var(--ink-2)}
+.num{font-variant-numeric:tabular-nums;text-align:right;white-space:nowrap}
+.muted{color:var(--muted)}
+.small{font-size:12px}
+.tbl-wrap{overflow-x:auto;margin-inline:-4px}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th{font-weight:500;color:var(--muted);font-size:12px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--line-2);white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td{padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+tr.click{cursor:pointer}
+tr.click:hover td{background:var(--surface-2)}
+.lnk{color:var(--accent-ink);cursor:pointer;text-decoration:none;border:0;background:none;font:inherit;padding:0;text-align:left}
+.lnk:hover{text-decoration:underline}
+.pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:1px 8px 1px 7px;border-radius:999px;white-space:nowrap;line-height:18px}
+.pill::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+.s-good{color:var(--good);background:var(--good-soft)}
+.s-warn{color:var(--warn);background:var(--warn-soft)}
+.s-bad{color:var(--bad);background:var(--bad-soft)}
+.s-info{color:var(--accent-ink);background:var(--accent-soft)}
+.s-idle{color:var(--idle);background:var(--idle-soft)}
+.tag{display:inline-block;font-size:11px;color:var(--ink-2);background:var(--surface-2);border-radius:4px;padding:0 6px;white-space:nowrap;line-height:18px}
+.filters{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.filters input[type=search],.filters select{font:inherit;font-size:13px;color:var(--ink);background:var(--surface);border:1px solid var(--line-2);border-radius:7px;padding:7px 10px;min-width:0}
+.filters input[type=search]{flex:1 1 220px}
+.seg{display:inline-flex;border:1px solid var(--line-2);border-radius:8px;overflow:hidden;flex-wrap:wrap}
+.seg button{font:inherit;font-size:13px;border:0;background:var(--surface);color:var(--ink-2);padding:6px 12px;cursor:pointer;border-right:1px solid var(--line-2)}
+.seg button:last-child{border-right:0}
+.seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+.btn{font:inherit;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 10px;cursor:pointer}
+.btn:hover{background:var(--surface-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.btn.primary:hover{background:var(--accent-ink)}
+.btn:disabled{opacity:.5;cursor:default}
+.subnav{display:flex;flex-wrap:wrap;gap:6px}
+/* drawer */
+.scrim{position:fixed;inset:0;background:rgba(10,14,20,.38);z-index:40}
+.drawer{position:fixed;top:0;right:0;bottom:0;width:min(880px,100%);background:var(--bg);z-index:41;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.drawer-h{display:flex;align-items:flex-start;gap:12px;padding:calc(14px + env(safe-area-inset-top,0px)) 18px 12px;border-bottom:1px solid var(--line);background:var(--surface)}
+.drawer-h .ttl{flex:1;min-width:0}
+.drawer-h h2{font-size:17px;word-break:keep-all}
+.drawer-b{flex:1;overflow-y:auto;padding:16px 18px calc(40px + env(safe-area-inset-bottom,0px));display:grid;gap:16px;align-content:start;grid-auto-rows:max-content}
+.drawer-b > *{min-width:0}
+.x{font:inherit;font-size:20px;line-height:1;border:0;background:none;color:var(--ink-2);cursor:pointer;padding:4px 6px;border-radius:6px}
+.x:hover{background:var(--surface-2)}
+.meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;font-size:12.5px;color:var(--ink-2)}
+.order{border-top:1px solid var(--line);padding:10px 0}
+.order:first-child{border-top:0}
+.order-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
+.order-h .amt{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+.order .ship{font-size:12px;color:var(--ink-2);white-space:pre-wrap;word-break:break-all;margin-top:3px}
+.log-item{display:grid;gap:3px;padding:9px 0;border-bottom:1px solid var(--line)}
+.log-item:last-child{border-bottom:0}
+.log-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
+.log-h .who{font-size:12px;color:var(--muted)}
+.log-note{font-size:13px;white-space:pre-wrap}
+.log-next{font-size:12px;color:var(--accent-ink)}
+.log-del{font-size:11.5px;color:var(--muted);border:0;background:none;cursor:pointer;margin-left:auto}
+.log-del:hover{color:var(--bad)}
+.log-outcome{font-size:11.5px;font-weight:600;padding:1px 7px;border-radius:999px}
+.log-outcome.ok{color:var(--good);background:var(--good-soft)}
+.log-outcome.pending{color:var(--warn);background:var(--warn-soft)}
+.log-outcome.none{color:var(--muted);background:var(--surface-2)}
+.log-form{display:grid;gap:8px;border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface)}
+.log-form .row{display:flex;flex-wrap:wrap;gap:8px}
+.log-form select,.log-form input[type=date]{font:inherit;font-size:13px;border:1px solid var(--line-2);border-radius:6px;padding:6px 8px;background:var(--surface)}
+.log-form textarea{font:inherit;font-size:13px;border:1px solid var(--line-2);border-radius:6px;padding:8px;resize:vertical;min-height:56px;background:var(--surface);color:var(--ink)}
+.log-form label.small{font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
+/* auth */
+.authwrap{min-height:100vh;display:flex;align-items:center;justify-content:center}
+.authcard{width:min(360px,100%);background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:28px;box-shadow:var(--shadow)}
+.authcard h1{font-size:18px;margin:0 0 4px}
+.authcard p.lede{margin-bottom:18px}
+.authcard label{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:4px;margin-top:12px}
+.authcard input{width:100%;font:inherit;font-size:14px;border:1px solid var(--line-2);border-radius:7px;padding:9px 10px;background:var(--surface);color:var(--ink)}
+.authcard .err{color:var(--bad);font-size:12.5px;margin-top:10px}
+.authcard .ok{color:var(--good);font-size:12.5px;margin-top:10px}
+.authcard .switch{margin-top:16px;font-size:12.5px;text-align:center;color:var(--ink-2)}
+.hide{display:none !important}
+.spin{color:var(--muted);font-size:13px;padding:20px}
+</style>
+
+<div id="auth" class="authwrap">
+  <div class="authcard">
+    <h1>거래처 주문 레이더</h1>
+    <p class="lede small">팀 계정으로 로그인하세요.</p>
+    <div id="loginBox">
+      <label>이메일</label>
+      <input id="li-email" type="email" autocomplete="username">
+      <label>비밀번호</label>
+      <input id="li-pw" type="password" autocomplete="current-password">
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn primary" id="btn-login" style="flex:1">로그인</button>
+      </div>
+      <div class="switch">아직 계정이 없나요? <a href="#" id="go-signup" class="lnk">가입하기</a> · <a href="#" id="go-forgot" class="lnk">비밀번호를 잊으셨나요?</a></div>
+      <div id="loginMsg"></div>
+    </div>
+    <div id="signupBox" class="hide">
+      <label>이름</label>
+      <input id="su-name" type="text" autocomplete="name">
+      <label>이메일</label>
+      <input id="su-email" type="email" autocomplete="username">
+      <label>비밀번호 (6자 이상)</label>
+      <input id="su-pw" type="password" autocomplete="new-password">
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn primary" id="btn-signup" style="flex:1">가입하기</button>
+      </div>
+      <div class="switch">이미 계정이 있나요? <a href="#" id="go-login" class="lnk">로그인</a></div>
+      <div id="signupMsg"></div>
+    </div>
+    <div id="forgotBox" class="hide">
+      <p class="lede small">가입할 때 쓴 이메일을 입력하면 비밀번호 재설정 링크를 보내드려요.</p>
+      <label>이메일</label>
+      <input id="fp-email" type="email" autocomplete="username">
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn primary" id="btn-forgot" style="flex:1">재설정 링크 보내기</button>
+      </div>
+      <div class="switch"><a href="#" id="go-login-2" class="lnk">로그인으로 돌아가기</a></div>
+      <div id="forgotMsg"></div>
+    </div>
+    <div id="resetBox" class="hide">
+      <p class="lede small">새 비밀번호를 설정하세요.</p>
+      <label>새 비밀번호 (6자 이상)</label>
+      <input id="rp-pw" type="password" autocomplete="new-password">
+      <div style="margin-top:16px;display:flex;gap:8px">
+        <button class="btn primary" id="btn-reset" style="flex:1">비밀번호 변경</button>
+      </div>
+      <div id="resetMsg"></div>
+    </div>
+  </div>
+</div>
+
+<div id="app" class="wrap hide">
+<header class="top">
+  <div class="brand">
+    <div><h1>거래처 주문 레이더</h1> <span class="sub">이카운트 주문 데이터 · Supabase</span></div>
+    <div class="whoami">
+      <span id="who-name"></span><span class="role" id="who-role"></span>
+      <button class="btn" id="btn-logout">로그아웃</button>
+    </div>
+  </div>
+  <nav class="tabs" id="tabs">
+    <button data-tab="customers" aria-selected="true">거래처</button>
+    <button data-tab="sales" aria-selected="false">영업</button>
+  </nav>
+</header>
+
+<section class="view" id="view-customers"></section>
+<section class="view hide" id="view-sales"></section>
+</div>
+
+<div id="drawerHost"></div>
+
+<script>
+const SUPABASE_URL = "https://hevlgbkkzrambtkqfbka.supabase.co";
+const SUPABASE_KEY = "sb_publishable_SHekPJ0rm5wZHxQORLY8Wg_GA1Jk-It";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const won = n => (n==null? '-' : Math.round(n).toLocaleString('ko-KR')+'원');
+const num = n => (n==null? '-' : Math.round(n).toLocaleString('ko-KR'));
+const fmtDate = d => d ? d : '-';
+const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function daysAgoStr(n){ if(n==null) return '-'; if(n<=0) return '오늘'; return n+'일 전'; }
+
+const STATUS_CLS = {'활성':'s-good','신규':'s-info','주의':'s-warn','이탈의심':'s-bad','휴면':'s-idle','일회성':'s-idle'};
+function statusPill(st){ return `<span class="pill ${STATUS_CLS[st]||'s-idle'}">${esc(st||'-')}</span>`; }
+
+let ME = null; // {id, name, role}
+let CUSTS = []; // customer_stats rows, loaded once per session
+let custById = new Map();
+let currentTab = 'customers';
+let currentSalesSub = 'priority';
+
+// ---------------- Auth ----------------
+const authBoxes = ['loginBox','signupBox','forgotBox','resetBox'];
+function showAuthBox(id){ authBoxes.forEach(b=> document.getElementById(b).classList.toggle('hide', b!==id) ); }
+
+document.getElementById('go-signup').onclick = (e)=>{e.preventDefault(); showAuthBox('signupBox');};
+document.getElementById('go-login').onclick = (e)=>{e.preventDefault(); showAuthBox('loginBox');};
+document.getElementById('go-forgot').onclick = (e)=>{e.preventDefault(); showAuthBox('forgotBox');};
+document.getElementById('go-login-2').onclick = (e)=>{e.preventDefault(); showAuthBox('loginBox');};
+
+document.getElementById('btn-login').onclick = async ()=>{
+  const email = document.getElementById('li-email').value.trim();
+  const password = document.getElementById('li-pw').value;
+  const msg = document.getElementById('loginMsg');
+  msg.innerHTML = '<div class="small muted">로그인 중...</div>';
+  const {data, error} = await sb.auth.signInWithPassword({email, password});
+  if(error){ msg.innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  msg.innerHTML = '';
+};
+
+document.getElementById('btn-signup').onclick = async ()=>{
+  const name = document.getElementById('su-name').value.trim();
+  const email = document.getElementById('su-email').value.trim();
+  const password = document.getElementById('su-pw').value;
+  const msg = document.getElementById('signupMsg');
+  if(!name || !email || password.length<6){ msg.innerHTML = '<div class="err">이름, 이메일, 6자 이상 비밀번호를 입력하세요.</div>'; return; }
+  msg.innerHTML = '<div class="small muted">가입 처리 중...</div>';
+  const {data, error} = await sb.auth.signUp({email, password, options:{data:{name}}});
+  if(error){
+    const already = /already registered|already exists|already been registered/i.test(error.message||'');
+    msg.innerHTML = already
+      ? `<div class="err">이미 가입된 이메일이에요. <a href="#" id="su-to-forgot" class="lnk">비밀번호 찾기</a>를 이용해주세요.</div>`
+      : `<div class="err">${esc(error.message)}</div>`;
+    const link = document.getElementById('su-to-forgot');
+    if(link) link.onclick = (e)=>{ e.preventDefault(); document.getElementById('fp-email').value = email; showAuthBox('forgotBox'); };
+    return;
+  }
+  if(data.session){ msg.innerHTML = ''; }
+  else { msg.innerHTML = '<div class="ok">가입되었습니다. 이메일 확인이 필요하면 메일함을 확인한 뒤 로그인해주세요.</div>'; }
+};
+
+document.getElementById('btn-forgot').onclick = async ()=>{
+  const email = document.getElementById('fp-email').value.trim();
+  const msg = document.getElementById('forgotMsg');
+  if(!email){ msg.innerHTML = '<div class="err">이메일을 입력하세요.</div>'; return; }
+  msg.innerHTML = '<div class="small muted">전송 중...</div>';
+  const {error} = await sb.auth.resetPasswordForEmail(email, {redirectTo: window.location.href});
+  if(error){ msg.innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  msg.innerHTML = '<div class="ok">재설정 링크를 이메일로 보냈어요. 메일함(스팸함 포함)을 확인한 뒤, 그 링크를 이 브라우저에서 열어주세요.</div>';
+};
+
+document.getElementById('btn-reset').onclick = async ()=>{
+  const pw = document.getElementById('rp-pw').value;
+  const msg = document.getElementById('resetMsg');
+  if(pw.length<6){ msg.innerHTML = '<div class="err">6자 이상 입력하세요.</div>'; return; }
+  msg.innerHTML = '<div class="small muted">변경 중...</div>';
+  const {error} = await sb.auth.updateUser({password: pw});
+  if(error){ msg.innerHTML = `<div class="err">${esc(error.message)}</div>`; return; }
+  msg.innerHTML = '<div class="ok">비밀번호가 변경됐어요. 이동합니다...</div>';
+  setTimeout(()=>{ window.location.href = window.location.href.split('#')[0].split('?')[0]; }, 900);
+};
+
+document.getElementById('btn-logout').onclick = async ()=>{ await sb.auth.signOut(); };
+
+sb.auth.onAuthStateChange(async (event, session)=>{
+  if(event === 'PASSWORD_RECOVERY'){
+    document.getElementById('app').classList.add('hide');
+    document.getElementById('auth').classList.remove('hide');
+    showAuthBox('resetBox');
+    return;
+  }
+  if(session && session.user){
+    await boot(session.user.id);
+  } else {
+    ME = null;
+    document.getElementById('app').classList.add('hide');
+    document.getElementById('auth').classList.remove('hide');
+  }
+});
+
+async function boot(uid){
+  const {data: prof, error} = await sb.from('profiles').select('id,name,role').eq('id', uid).single();
+  if(error || !prof){ return; }
+  ME = prof;
+  document.getElementById('who-name').textContent = ME.name || '';
+  document.getElementById('who-role').textContent = ME.role==='admin' ? '관리자' : '팀원';
+  document.getElementById('auth').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  if(CUSTS.length===0){ await loadCustomers(); }
+  renderTab();
+}
+
+// ---------------- Tabs ----------------
+document.getElementById('tabs').addEventListener('click', (e)=>{
+  const b = e.target.closest('button[data-tab]'); if(!b) return;
+  currentTab = b.dataset.tab;
+  [...document.querySelectorAll('#tabs button')].forEach(x=>x.setAttribute('aria-selected', x===b));
+  document.getElementById('view-customers').classList.toggle('hide', currentTab!=='customers');
+  document.getElementById('view-sales').classList.toggle('hide', currentTab!=='sales');
+  renderTab();
+});
+
+function renderTab(){
+  if(currentTab==='customers') renderCustomersView();
+  else renderSalesView();
+}
+
+// ---------------- Data load ----------------
+async function loadCustomers(){
+  document.getElementById('view-customers').innerHTML = '<div class="spin">불러오는 중...</div>';
+  const {data, error} = await sb.from('customer_stats').select('*').order('total_amount', {ascending:false});
+  if(error){ document.getElementById('view-customers').innerHTML = `<div class="panel err">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  CUSTS = data || [];
+  custById = new Map(CUSTS.map(c=>[c.customer_id, c]));
+}
+
+// ---------------- Customers view ----------------
+let custQuery = '';
+let custStatusFilter = '전체';
+const STATUS_ORDER = ['전체','활성','신규','주의','이탈의심','휴면','일회성'];
+
+function filteredCustomers(){
+  let list = CUSTS;
+  if(custStatusFilter !== '전체') list = list.filter(c=>c.status===custStatusFilter);
+  if(custQuery.trim()){
+    const q = custQuery.trim().toLowerCase();
+    list = list.filter(c=> (c.name||'').toLowerCase().includes(q) || (c.edu_office||'').toLowerCase().includes(q));
+  }
+  return list;
+}
+
+function renderCustomersView(){
+  const el = document.getElementById('view-customers');
+  const list = filteredCustomers().slice(0, 300);
+  el.innerHTML = `
+    <div class="panel">
+      <div class="panel-h">
+        <h2>거래처 (${num(CUSTS.length)}곳)</h2>
+        <span class="note">최근 데이터 기준 · 매출 많은 순</span>
+      </div>
+      <div class="filters">
+        <input type="search" id="cq" placeholder="거래처명, 교육청으로 검색" value="${esc(custQuery)}">
+        <select id="cstatus">${STATUS_ORDER.map(s=>`<option ${s===custStatusFilter?'selected':''}>${s}</option>`).join('')}</select>
+      </div>
+      <div class="tbl-wrap" style="margin-top:12px">
+        <table>
+          <thead><tr><th>거래처</th><th>유형</th><th>상태</th><th class="num">누적매출</th><th class="num">주문수</th><th class="num">최근주문</th></tr></thead>
+          <tbody id="custRows"></tbody>
+        </table>
+      </div>
+      ${filteredCustomers().length>300 ? `<div class="small muted" style="margin-top:8px">검색 결과 ${num(filteredCustomers().length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>` : ''}
+    </div>`;
+  document.getElementById('custRows').innerHTML = list.map(c=>`
+    <tr class="click" data-id="${c.customer_id}">
+      <td>${esc(c.name)}</td>
+      <td><span class="tag">${esc(c.ctype||'-')}</span></td>
+      <td>${statusPill(c.status)}</td>
+      <td class="num">${won(c.total_amount)}</td>
+      <td class="num">${num(c.order_count)}</td>
+      <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
+    </tr>`).join('');
+  document.getElementById('cq').oninput = (e)=>{ custQuery = e.target.value; renderCustomersView(); };
+  document.getElementById('cstatus').onchange = (e)=>{ custStatusFilter = e.target.value; renderCustomersView(); };
+  document.getElementById('custRows').onclick = (e)=>{
+    const tr = e.target.closest('tr[data-id]'); if(!tr) return;
+    openDrawer(Number(tr.dataset.id));
+  };
+}
+
+// ---------------- Sales view ----------------
+function renderSalesView(){
+  const el = document.getElementById('view-sales');
+  el.innerHTML = `
+    <div class="subnav">
+      <div class="seg" id="salesSeg">
+        <button data-s="priority" aria-pressed="${currentSalesSub==='priority'}">영업 우선순위</button>
+        <button data-s="churn" aria-pressed="${currentSalesSub==='churn'}">이탈 감지</button>
+        <button data-s="contact" aria-pressed="${currentSalesSub==='contact'}">연락 성과</button>
+      </div>
+    </div>
+    <div id="salesBody"></div>`;
+  document.getElementById('salesSeg').onclick = (e)=>{
+    const b = e.target.closest('button[data-s]'); if(!b) return;
+    currentSalesSub = b.dataset.s; renderSalesView();
+  };
+  if(currentSalesSub==='priority') renderPriority();
+  else if(currentSalesSub==='churn') renderChurn();
+  else renderContactOutcome();
+}
+
+function renderPriority(){
+  const body = document.getElementById('salesBody');
+  const list = CUSTS.filter(c=>c.status==='주의'||c.status==='이탈의심').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,80);
+  body.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>영업 우선순위</h2><span class="note">상태가 주의·이탈의심이면서 누적매출이 큰 순 (상위 ${list.length}곳)</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>거래처</th><th>상태</th><th class="num">누적매출</th><th class="num">최근주문</th><th class="num">평소주기</th></tr></thead>
+      <tbody>${list.map(c=>`<tr class="click" data-id="${c.customer_id}">
+        <td>${esc(c.name)}</td><td>${statusPill(c.status)}</td>
+        <td class="num">${won(c.total_amount)}</td>
+        <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
+        <td class="num">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일' : '-'}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+  body.querySelector('table').onclick = (e)=>{ const tr=e.target.closest('tr[data-id]'); if(tr) openDrawer(Number(tr.dataset.id)); };
+}
+
+function renderChurn(){
+  const body = document.getElementById('salesBody');
+  const list = CUSTS.filter(c=>c.status==='이탈의심').sort((a,b)=>(b.days_since_last_order||0)-(a.days_since_last_order||0)).slice(0,80);
+  body.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>이탈 감지</h2><span class="note">이탈의심 상태, 마지막 주문 이후 경과일이 긴 순 (상위 ${list.length}곳)</span></div>
+    <div class="tbl-wrap"><table>
+      <thead><tr><th>거래처</th><th class="num">경과일</th><th class="num">평소주기</th><th class="num">누적매출</th><th class="num">주문수</th></tr></thead>
+      <tbody>${list.map(c=>`<tr class="click" data-id="${c.customer_id}">
+        <td>${esc(c.name)}</td>
+        <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
+        <td class="num">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일' : '-'}</td>
+        <td class="num">${won(c.total_amount)}</td>
+        <td class="num">${num(c.order_count)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>
+  </div>`;
+  body.querySelector('table').onclick = (e)=>{ const tr=e.target.closest('tr[data-id]'); if(tr) openDrawer(Number(tr.dataset.id)); };
+}
+
+// success-window in days used for "영업 성공" matching
+const OUTCOME_WINDOW_DAYS = 14;
+function computeOutcome(activityDateStr, orderDates){
+  // orderDates: array of 'YYYY-MM-DD' strings for that customer
+  const a = new Date(activityDateStr+'T00:00:00');
+  const end = new Date(a.getTime() + OUTCOME_WINDOW_DAYS*86400000);
+  const today = new Date(new Date().toISOString().slice(0,10)+'T00:00:00');
+  let hit = null;
+  for(const ds of orderDates){
+    const d = new Date(ds+'T00:00:00');
+    if(d>=a && d<=end){ if(!hit || d<hit) hit = d; }
+  }
+  if(hit) return {state:'ok', date: hit.toISOString().slice(0,10)};
+  if(today <= end) return {state:'pending'};
+  return {state:'none'};
+}
+
+async function renderContactOutcome(){
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '<div class="spin">불러오는 중...</div>';
+  const {data: acts, error} = await sb.from('activities')
+    .select('id,customer_id,kind,note,created_at,author_id,profiles(name),customers(name)')
+    .in('kind', ['call','visit'])
+    .order('created_at', {ascending:false})
+    .limit(500);
+  if(error){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  if(!acts || acts.length===0){
+    body.innerHTML = `<div class="panel"><div class="panel-h"><h2>연락 성과</h2></div><p class="lede small muted">아직 기록된 통화·방문이 없어요. 거래처 상세에서 통화·방문 기록을 남기면 여기서 성공률을 볼 수 있어요.</p></div>`;
+    return;
+  }
+  const custIds = [...new Set(acts.map(a=>a.customer_id))];
+  const {data: ords} = await sb.from('orders').select('customer_id,order_date').in('customer_id', custIds);
+  const ordersByCust = new Map();
+  (ords||[]).forEach(o=>{ if(!ordersByCust.has(o.customer_id)) ordersByCust.set(o.customer_id, []); ordersByCust.get(o.customer_id).push(o.order_date); });
+
+  const rows = acts.map(a=>{
+    const ds = a.created_at.slice(0,10);
+    const outcome = computeOutcome(ds, ordersByCust.get(a.customer_id)||[]);
+    return {...a, ds, outcome};
+  });
+  const total = rows.length;
+  const ok = rows.filter(r=>r.outcome.state==='ok').length;
+  const pending = rows.filter(r=>r.outcome.state==='pending').length;
+  const decided = total - pending;
+  const rate = decided>0 ? Math.round(ok/decided*100) : 0;
+
+  const byAuthor = new Map();
+  rows.forEach(r=>{
+    const key = r.author_id;
+    if(!byAuthor.has(key)) byAuthor.set(key, {name: (r.profiles&&r.profiles.name)||'(알수없음)', total:0, ok:0, decided:0});
+    const e = byAuthor.get(key); e.total++;
+    if(r.outcome.state!=='pending'){ e.decided++; if(r.outcome.state==='ok') e.ok++; }
+  });
+  const authorRows = [...byAuthor.values()].sort((a,b)=>b.total-a.total);
+
+  body.innerHTML = `
+    <div class="panel">
+      <div class="panel-h"><h2>연락 성과</h2><span class="note">통화·방문 후 ${OUTCOME_WINDOW_DAYS}일 이내 주문이 들어오면 "성공"으로 판단</span></div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">총 접촉</div><div class="v">${num(total)}</div></div>
+        <div class="kpi"><div class="l">성공</div><div class="v">${num(ok)}</div></div>
+        <div class="kpi"><div class="l">성공률</div><div class="v">${decided>0? rate+'%' : '-'}</div><div class="s">판정 완료 ${num(decided)}건 기준</div></div>
+        <div class="kpi"><div class="l">대기중</div><div class="v">${num(pending)}</div><div class="s">${OUTCOME_WINDOW_DAYS}일 아직 안 지남</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>담당자별</h3></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>담당자</th><th class="num">접촉수</th><th class="num">성공</th><th class="num">성공률</th></tr></thead>
+        <tbody>${authorRows.map(a=>`<tr><td>${esc(a.name)}</td><td class="num">${num(a.total)}</td><td class="num">${num(a.ok)}</td><td class="num">${a.decided>0? Math.round(a.ok/a.decided*100)+'%':'-'}</td></tr>`).join('')}</tbody>
+      </table></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>최근 기록</h3></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>날짜</th><th>거래처</th><th>구분</th><th>담당자</th><th>결과</th></tr></thead>
+        <tbody>${rows.slice(0,100).map(r=>`<tr class="click" data-id="${r.customer_id}">
+          <td>${r.ds}</td><td>${esc((r.customers&&r.customers.name)||'')}</td>
+          <td>${r.kind==='call'?'전화':r.kind==='visit'?'방문':'메모'}</td>
+          <td>${esc((r.profiles&&r.profiles.name)||'')}</td>
+          <td>${outcomeBadge(r.outcome)}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+}
+
+function outcomeBadge(o){
+  if(o.state==='ok') return `<span class="log-outcome ok">주문 성공 (${o.date})</span>`;
+  if(o.state==='pending') return `<span class="log-outcome pending">대기중</span>`;
+  return `<span class="log-outcome none">성과 없음</span>`;
+}
+
+// ---------------- Drawer ----------------
+async function openDrawer(custId){
+  const c = custById.get(custId);
+  if(!c) return;
+  const host = document.getElementById('drawerHost');
+  host.innerHTML = `<div class="scrim"></div>
+    <div class="drawer">
+      <div class="drawer-h">
+        <div class="ttl">
+          <h2>${esc(c.name)}</h2>
+          <div class="meta">${statusPill(c.status)} <span class="tag">${esc(c.ctype||'-')}</span> ${c.edu_office?`<span class="tag">${esc(c.edu_office)}</span>`:''}</div>
+        </div>
+        <button class="x" aria-label="닫기">✕</button>
+      </div>
+      <div class="drawer-b" id="drawerBody"><div class="spin">불러오는 중...</div></div>
+    </div>`;
+  const close = ()=>{ host.innerHTML=''; };
+  host.querySelector('.scrim').onclick = close;
+  host.querySelector('.x').onclick = close;
+
+  const [{data: orders}, {data: acts}] = await Promise.all([
+    sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).limit(30),
+    sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false})
+  ]);
+  const orderDates = (orders||[]).map(o=>o.order_date);
+
+  const body = document.getElementById('drawerBody');
+  if(!body) return; // drawer already closed
+  body.innerHTML = `
+    <div class="kpis">
+      <div class="kpi"><div class="l">누적매출</div><div class="v">${won(c.total_amount)}</div></div>
+      <div class="kpi"><div class="l">주문수</div><div class="v">${num(c.order_count)}</div></div>
+      <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
+      <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><h3>최근 주문 (${orders?orders.length:0}건)</h3></div>
+      ${(orders||[]).map(o=>`<div class="order">
+        <div class="order-h"><b>${o.order_date}</b> <span class="small muted">${esc(o.item_name||'')}</span> <span class="amt">${won(o.supply_amount)}</span></div>
+        ${o.address?`<div class="ship">${esc(o.address)}</div>`:''}
+      </div>`).join('') || '<p class="small muted">주문 이력이 없습니다.</p>'}
+    </div>
+    <div class="panel" id="logPanel"></div>`;
+
+  renderLogSection(custId, acts||[], orderDates);
+}
+
+function renderLogSection(custId, acts, orderDates){
+  const panel = document.getElementById('logPanel');
+  if(!panel) return;
+  panel.innerHTML = `
+    <div class="panel-h"><h3>통화·방문 기록</h3><span class="note">${acts.length}건</span></div>
+    <div id="logList">${acts.map(a=>logItemHTML(a, orderDates)).join('') || '<p class="small muted">아직 기록이 없습니다.</p>'}</div>
+    <div class="log-form" style="margin-top:12px">
+      <div class="row">
+        <select id="log-kind">
+          <option value="call">전화</option>
+          <option value="visit">방문</option>
+          <option value="memo">메모</option>
+        </select>
+        <label class="small">다음 연락 예정일 <input type="date" id="log-next"></label>
+      </div>
+      <textarea id="log-note" placeholder="통화·방문 내용을 남겨주세요"></textarea>
+      <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="log-submit">기록 남기기</button></div>
+      <div id="log-msg"></div>
+    </div>`;
+  panel.querySelectorAll('.log-del').forEach(btn=>{
+    btn.onclick = async ()=>{
+      if(!confirm('이 기록을 삭제할까요?')) return;
+      const id = btn.dataset.id;
+      const {error} = await sb.from('activities').delete().eq('id', id);
+      if(error){ alert('삭제 실패: '+error.message); return; }
+      const {data: acts2} = await sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false});
+      renderLogSection(custId, acts2||[], orderDates);
+    };
+  });
+  document.getElementById('log-submit').onclick = async ()=>{
+    const kind = document.getElementById('log-kind').value;
+    const note = document.getElementById('log-note').value.trim();
+    const next = document.getElementById('log-next').value || null;
+    const msg = document.getElementById('log-msg');
+    if(!note){ msg.innerHTML = '<div class="err small">내용을 입력해주세요.</div>'; return; }
+    const {error} = await sb.from('activities').insert({customer_id: custId, kind, note, next_contact_date: next});
+    if(error){ msg.innerHTML = `<div class="err small">저장 실패: ${esc(error.message)}</div>`; return; }
+    const c = custById.get(custId);
+    const {data: orders2} = await sb.from('orders').select('order_date').eq('customer_id', custId);
+    const newOrderDates = (orders2||[]).map(o=>o.order_date);
+    const {data: acts2} = await sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false});
+    renderLogSection(custId, acts2||[], newOrderDates);
+  };
+}
+
+const LOG_TYPE = {call:'전화', visit:'방문', memo:'메모'};
+function logItemHTML(a, orderDates){
+  const ds = a.created_at.slice(0,10);
+  const outcome = computeOutcome(ds, orderDates);
+  const mine = ME && a.author_id===ME.id;
+  const canDel = mine || (ME && ME.role==='admin');
+  return `<div class="log-item">
+    <div class="log-h">
+      <span class="tag">${LOG_TYPE[a.kind]||a.kind}</span>
+      <span class="who">${esc((a.profiles&&a.profiles.name)||'')} · ${ds}</span>
+      ${outcomeBadge(outcome)}
+      ${canDel? `<button class="log-del" data-id="${a.id}">삭제</button>` : ''}
+    </div>
+    <div class="log-note">${esc(a.note)}</div>
+    ${a.next_contact_date? `<div class="log-next">다음 연락 예정: ${a.next_contact_date}</div>` : ''}
+  </div>`;
+}
+</script>
