@@ -244,7 +244,6 @@ dl.defs dd{margin:0;color:var(--ink-2)}
     <button data-tab="summary" aria-selected="true">요약</button>
     <button data-tab="customers" aria-selected="false">거래처</button>
     <button data-tab="sales" aria-selected="false">영업</button>
-    <button data-tab="forecast" aria-selected="false">재주문 예측</button>
     <button data-tab="products" aria-selected="false">제품가격</button>
   </nav>
 </header>
@@ -252,7 +251,6 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 <section class="view" id="view-summary"></section>
 <section class="view hide" id="view-customers"></section>
 <section class="view hide" id="view-sales"></section>
-<section class="view hide" id="view-forecast"></section>
 <section class="view hide" id="view-products"></section>
 </div>
 
@@ -294,7 +292,7 @@ let CUSTS = []; // customer_stats rows, loaded once per session
 let custById = new Map();
 let currentTab = 'summary';
 let currentSalesSub = 'priority';
-const VIEW_IDS = ['summary','customers','sales','forecast','products'];
+const VIEW_IDS = ['summary','customers','sales','products'];
 
 // ---------------- Auth ----------------
 const authBoxes = ['loginBox','signupBox','forgotBox','resetBox'];
@@ -400,7 +398,6 @@ function renderTab(){
   if(currentTab==='summary') renderSummaryView();
   else if(currentTab==='customers') renderCustomersView();
   else if(currentTab==='sales') renderSalesView();
-  else if(currentTab==='forecast') renderForecastView();
   else if(currentTab==='products') renderProductsView();
 }
 
@@ -586,10 +583,10 @@ async function renderSummaryView(){
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
-// ---------------- 재주문 예측 ----------------
+// ---------------- 재주문 예측 (영업 탭의 하위 시트) ----------------
 let forecastWindow = 30;
 async function renderForecastView(){
-  const el = document.getElementById('view-forecast');
+  const el = document.getElementById('salesBody');
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
   const end = new Date(); end.setDate(end.getDate()+forecastWindow);
   const start = new Date(); start.setDate(start.getDate()-21);
@@ -760,12 +757,13 @@ function renderSalesView(){
     <div class="subnav">
       <div class="seg" id="salesSeg">
         <button data-s="priority" aria-pressed="${currentSalesSub==='priority'}">영업 우선순위</button>
+        <button data-s="forecast" aria-pressed="${currentSalesSub==='forecast'}">재주문 예측</button>
         <button data-s="churn" aria-pressed="${currentSalesSub==='churn'}">이탈 감지</button>
-        <button data-s="contact" aria-pressed="${currentSalesSub==='contact'}">연락 성과</button>
         <button data-s="itemstop" aria-pressed="${currentSalesSub==='itemstop'}">품목 끊김</button>
         <button data-s="reco" aria-pressed="${currentSalesSub==='reco'}">추가구매 추천</button>
         <button data-s="program" aria-pressed="${currentSalesSub==='program'}">공동구매 미참여</button>
         <button data-s="gift" aria-pressed="${currentSalesSub==='gift'}">명절선물 고객</button>
+        <button data-s="contact" aria-pressed="${currentSalesSub==='contact'}">연락 성과</button>
       </div>
     </div>
     <div id="salesBody"></div>`;
@@ -773,7 +771,7 @@ function renderSalesView(){
     const b = e.target.closest('button[data-s]'); if(!b) return;
     currentSalesSub = b.dataset.s; renderSalesView();
   };
-  ({priority:renderPriority, churn:renderChurn, contact:renderContactOutcome, itemstop:renderItemStop, reco:renderReco, program:renderProgram, gift:renderGift})[currentSalesSub]();
+  ({priority:renderPriority, forecast:renderForecastView, churn:renderChurn, itemstop:renderItemStop, reco:renderReco, program:renderProgram, gift:renderGift, contact:renderContactOutcome})[currentSalesSub]();
 }
 
 async function renderItemStop(){
