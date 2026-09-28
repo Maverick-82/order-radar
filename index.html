@@ -567,19 +567,24 @@ async function renderItemsView(){
   const {data, error} = await sb.from('item_totals').select('*').order('amount', {ascending:false}).limit(1500);
   if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   const all = data||[];
+  el.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>품목별 주문금액</h2><span class="note" id="itemsCount"></span></div>
+    <div class="filters"><input type="search" id="iq" placeholder="품목명 검색" value="${esc(itemQuery)}"></div>
+    <div id="itemsResult" style="margin-top:10px"></div>
+  </div>`;
+  // 입력창을 매 키 입력마다 새로 그리면 포커스가 날아가서 글자가 안 눌리는 것처럼 보여요 —
+  // 그래서 입력창은 그대로 두고, 결과 영역만 갱신합니다.
   function draw(){
     const q = itemQuery.trim().toLowerCase();
     const list = q ? all.filter(i=>i.item_name.toLowerCase().includes(q)) : all;
-    el.innerHTML = `<div class="panel">
-      <div class="panel-h"><h2>품목별 주문금액</h2><span class="note">${num(list.length)}개 품목</span></div>
-      <div class="filters"><input type="search" id="iq" placeholder="품목명 검색" value="${esc(itemQuery)}"></div>
-      <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>품목</th><th class="num">금액</th><th class="num">수량</th><th class="num">주문</th><th class="num">거래처</th></tr></thead><tbody>
+    document.getElementById('itemsCount').textContent = `${num(list.length)}개 품목`;
+    document.getElementById('itemsResult').innerHTML = `
+      <div class="tbl-wrap"><table><thead><tr><th>품목</th><th class="num">금액</th><th class="num">수량</th><th class="num">주문</th><th class="num">거래처</th></tr></thead><tbody>
       ${list.slice(0,300).map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td><td class="num">${num(i.order_count)}</td><td class="num">${num(i.customer_count)}</td></tr>`).join('')}
       </tbody></table></div>
-      ${list.length>300?`<div class="small muted" style="margin-top:8px">검색 결과 ${num(list.length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>`:''}
-    </div>`;
-    document.getElementById('iq').oninput = (e)=>{ itemQuery=e.target.value; draw(); };
+      ${list.length>300?`<div class="small muted" style="margin-top:8px">검색 결과 ${num(list.length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>`:''}`;
   }
+  document.getElementById('iq').oninput = (e)=>{ itemQuery=e.target.value; draw(); };
   draw();
 }
 
@@ -600,11 +605,10 @@ function filteredCustomers(){
 
 function renderCustomersView(){
   const el = document.getElementById('view-customers');
-  const list = filteredCustomers().slice(0, 300);
   el.innerHTML = `
     <div class="panel">
       <div class="panel-h">
-        <h2>거래처 (${num(CUSTS.length)}곳)</h2>
+        <h2 id="custHeading">거래처</h2>
         <span class="note">최근 데이터 기준 · 매출 많은 순</span>
       </div>
       <div class="filters">
@@ -617,23 +621,33 @@ function renderCustomersView(){
           <tbody id="custRows"></tbody>
         </table>
       </div>
-      ${filteredCustomers().length>300 ? `<div class="small muted" style="margin-top:8px">검색 결과 ${num(filteredCustomers().length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>` : ''}
+      <div class="small muted" id="custMoreNote" style="margin-top:8px"></div>
     </div>`;
-  document.getElementById('custRows').innerHTML = list.map(c=>`
-    <tr class="click" data-id="${c.customer_id}">
-      <td>${esc(c.name)}</td>
-      <td><span class="tag">${esc(c.ctype||'-')}</span></td>
-      <td>${statusPill(c.status)}</td>
-      <td class="num">${won(c.total_amount)}</td>
-      <td class="num">${num(c.order_count)}</td>
-      <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
-    </tr>`).join('');
-  document.getElementById('cq').oninput = (e)=>{ custQuery = e.target.value; renderCustomersView(); };
-  document.getElementById('cstatus').onchange = (e)=>{ custStatusFilter = e.target.value; renderCustomersView(); };
+  // 검색창 자체를 매 키 입력마다 새로 그리면(innerHTML 전체 교체) 포커스가 날아가서
+  // 글자가 안 눌리는 것처럼 보여요 — 그래서 입력창은 그대로 두고, 목록(tbody)만 갱신합니다.
+  function drawList(){
+    const filtered = filteredCustomers();
+    const list = filtered.slice(0, 300);
+    document.getElementById('custHeading').textContent = `거래처 (${num(CUSTS.length)}곳)`;
+    document.getElementById('custRows').innerHTML = list.map(c=>`
+      <tr class="click" data-id="${c.customer_id}">
+        <td>${esc(c.name)}</td>
+        <td><span class="tag">${esc(c.ctype||'-')}</span></td>
+        <td>${statusPill(c.status)}</td>
+        <td class="num">${won(c.total_amount)}</td>
+        <td class="num">${num(c.order_count)}</td>
+        <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
+      </tr>`).join('');
+    document.getElementById('custMoreNote').textContent = filtered.length>300
+      ? `검색 결과 ${num(filtered.length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.` : '';
+  }
+  document.getElementById('cq').oninput = (e)=>{ custQuery = e.target.value; drawList(); };
+  document.getElementById('cstatus').onchange = (e)=>{ custStatusFilter = e.target.value; drawList(); };
   document.getElementById('custRows').onclick = (e)=>{
     const tr = e.target.closest('tr[data-id]'); if(!tr) return;
     openDrawer(Number(tr.dataset.id));
   };
+  drawList();
 }
 
 // ---------------- Sales view ----------------
