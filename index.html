@@ -548,8 +548,14 @@ async function renderSummaryView(){
   const totalAmount = CUSTS.reduce((s,c)=>s+(Number(c.total_amount)||0),0);
   const totalOrders = CUSTS.reduce((s,c)=>s+(Number(c.order_count)||0),0);
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
-  const byType = {}; CUSTS.forEach(c=>byType[c.ctype||'미분류']=(byType[c.ctype||'미분류']||0)+(Number(c.total_amount)||0));
-  const topItems = topMergedItems(itemRows, 12);
+  // 유형별 누적매출 상위에서는 초등학교와 유치원·어린이집을 한 줄로 합쳐서 보여줌
+  const byType = {};
+  CUSTS.forEach(c=>{
+    let t = c.ctype || '미분류';
+    if(t==='초등학교' || t==='유치원·어린이집') t = '초등학교·유치원';
+    byType[t] = (byType[t]||0) + (Number(c.total_amount)||0);
+  });
+  const topItems = topMergedItems(itemRows, 40);
   const [a,b] = monthRangeBounds(summaryMonths, summaryRange);
   const chartRows = summaryMonths.slice(a,b);
   el.innerHTML = `
@@ -572,7 +578,7 @@ async function renderSummaryView(){
   <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
     ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
   <div class="panel"><div class="panel-h"><h2>주요 품목</h2><span class="note">누적금액 상위 · 특가·공동구매 등 표기만 다른 동일 품목은 합산</span></div>
-    <div class="tbl-wrap"><table><thead><tr><th>품목</th><th class="num">누적금액</th><th class="num">수량</th></tr></thead><tbody>
+    <div class="tbl-wrap" style="max-height:360px;overflow-y:auto"><table><thead><tr><th>품목</th><th class="num">누적금액</th><th class="num">수량</th></tr></thead><tbody>
     ${topItems.map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   el.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ summaryRange = b.dataset.yr; renderSummaryView(); });
