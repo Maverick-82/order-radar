@@ -570,9 +570,16 @@ function topMergedItems(rows, n){
 let custYearTotals = null;
 async function ensureCustYearTotalsLoaded(){
   if(custYearTotals) return custYearTotals;
-  const {data, error} = await sb.from('customer_year_totals').select('*');
-  if(error){ custYearTotals = []; throw error; }
-  custYearTotals = data || [];
+  let all = [];
+  const pageSize = 1000;
+  for(let from=0; ; from += pageSize){
+    const {data, error} = await sb.from('customer_year_totals').select('*')
+      .range(from, from+pageSize-1);
+    if(error){ custYearTotals = []; throw error; }
+    all = all.concat(data || []);
+    if(!data || data.length < pageSize) break;
+  }
+  custYearTotals = all;
   return custYearTotals;
 }
 // 요약 탭 상단 기간칩(최근12개월/연도/전체)과 거래처 상세창의 기간칩이 같이 쓰는 라벨 함수.
@@ -676,7 +683,7 @@ async function renderForecastView(){
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
   const end = new Date(); end.setDate(end.getDate()+forecastWindow);
   const start = new Date(); start.setDate(start.getDate()-21);
-  const {data, error} = await sb.from('item_customer_stats').select('*')
+  const {data, error} = await sb.from('item_family_stats').select('*')
     .neq('status','끊김의심')
     .gte('next_date', start.toISOString().slice(0,10))
     .lte('next_date', end.toISOString().slice(0,10))
@@ -691,6 +698,7 @@ async function renderForecastView(){
     <p class="explain">품목별로 3번 이상 주기적으로 산 이력이 있으면 <b>평소 주문 간격</b>으로 다음 주문일을 예상했어요. 재고 준비나 먼저 연락하는 데 쓰세요. '지연'은 예상일이 조금 지난 곳이에요 — 오래 지난 곳은 영업 탭의 '품목 끊김'에서 볼 수 있어요.</p>
     ${critHelp('예상일·상태는 이렇게 계산했어요', `
       <dt>대상 품목</dt><dd>같은 거래처가 같은 품목을 3번 이상 주문한 경우만 — 1~2번만 산 품목은 주기를 알 수 없어 제외</dd>
+      <dt>같은 품목 판정</dt><dd>특가·공동구매·교육청 등 태그, 포장 매수 표기 차이는 무시하고, 복사용지·핸드타올류는 무게(75/80/85g)나 등급(일반지/고급지 등) 차이도 같은 품목으로 봐요 — 규격(A4/A3/B4 등)은 다른 품목으로 구분해요</dd>
       <dt>예상일</dt><dd>그 품목 주문 날짜들 사이 간격의 중앙값(평소 주기)을 마지막 주문일에 더해서 계산</dd>
       <dt>${statusPill('정상')}</dt><dd>예상일까지 15일 이상 남음</dd>
       <dt>${statusPill('임박')}</dt><dd>예상일이 14일 이내로 다가옴</dd>
@@ -873,7 +881,7 @@ async function renderItemStop(){
   const body = document.getElementById('salesBody');
   body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
   const activeIds = new Set(CUSTS.filter(c=>c.status==='활성'||c.status==='신규').map(c=>c.customer_id));
-  const {data, error} = await sb.from('item_customer_stats').select('*')
+  const {data, error} = await sb.from('item_family_stats').select('*')
     .in('status', ['끊김의심','지연'])
     .order('total_amount', {ascending:false})
     .limit(1000);
@@ -886,6 +894,7 @@ async function renderItemStop(){
     ${critHelp('대상은 이렇게 골랐어요', `
       <dt>대상 거래처</dt><dd>거래처 자체는 여전히 활성 또는 신규 상태 — 다른 품목은 계속 주문 중인 곳만</dd>
       <dt>대상 품목</dt><dd>그 거래처가 3번 이상 주기적으로 산 적 있는 품목 중에서만 판단 (1~2번만 산 품목은 제외)</dd>
+      <dt>같은 품목 판정</dt><dd>특가·공동구매·교육청 등 태그, 포장 매수 표기 차이는 무시하고, 복사용지·핸드타올류는 무게(75/80/85g)나 등급(일반지/고급지 등) 차이도 같은 품목으로 봐요 — 규격(A4/A3/B4 등)은 다른 품목으로 구분해요</dd>
       <dt>${statusPill('지연')}</dt><dd>경과일이 평소주기×1.5(또는 20일 중 큰 값)를 넘음 — 슬슬 확인해볼 단계</dd>
       <dt>${statusPill('끊김의심')}</dt><dd>경과일이 평소주기×3(또는 75일 중 큰 값)을 넘음 — 다른 곳에서 사고 있을 가능성이 큰 단계</dd>
       <dt>정렬</dt><dd>그 품목의 누적 구매금액이 큰 순</dd>
@@ -1201,12 +1210,13 @@ function salesTipHTML(c){
 // 이 거래처에 한해서, 영업 탭 5개 패널(재주문 예측·이탈 감지·품목 끊김·추가구매 추천)이 쓰는 것과
 // 완전히 같은 기준으로 계산한 품목별 근거를 보여줌 — "거래처별로도 설명이 상세했으면 좋겠다"는
 // 요청에 맞춰, 패널에서 보던 판정을 그 거래처 하나로 좁혀서 구체적인 품목명·날짜·숫자로 보여준다.
-function salesDetailHTML(c, itemStats, recoRows){
+function salesDetailHTML(c, itemStats, recoRows, itemStatsSku){
   const stats = itemStats || [];
   const stopped = stats.filter(r=>r.status==='끊김의심').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0));
   const delayed = stats.filter(r=>r.status==='지연').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0));
   const upcoming = stats.filter(r=>r.status==='임박').sort((a,b)=> (a.next_date<b.next_date?-1:1));
-  const have = new Set(stats.map(r=>r.item_name));
+  // 추천(미구매 품목) 제외 목록은 '추가구매 추천' 패널과 같은 기준(정확한 품목명)으로 맞춰서 비교
+  const have = new Set((itemStatsSku||stats).map(r=>r.item_name));
   const recos = (recoRows||[]).filter(r=>!have.has(r.item_name)).slice(0,3);
 
   const li = (arr, fmt) => arr.slice(0,5).map(r=>`<li>${fmt(r)}</li>`).join('');
@@ -1271,11 +1281,12 @@ async function openDrawer(custId){
   host.querySelector('.scrim').onclick = close;
   host.querySelector('.x').onclick = close;
 
-  const [{data: orders}, {data: acts}, {data: allOrders}, months, {data: itemStats}, {data: recoRows}] = await Promise.all([
+  const [{data: orders}, {data: acts}, {data: allOrders}, months, {data: itemStats}, {data: itemStatsSku}, {data: recoRows}] = await Promise.all([
     sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).order('order_no', {ascending:false}).limit(150),
     sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
     sb.from('orders').select('order_date,supply_amount,order_no').eq('customer_id', custId),
     ensureMonthsLoaded().catch(()=>[]),
+    sb.from('item_family_stats').select('*').eq('customer_id', custId).then(r=>r, ()=>({data:[]})),
     sb.from('item_customer_stats').select('*').eq('customer_id', custId).then(r=>r, ()=>({data:[]})),
     c.ctype ? sb.from('item_type_penetration').select('*').eq('ctype', c.ctype).order('penetration_pct', {ascending:false}).limit(30).then(r=>r, ()=>({data:[]})) : Promise.resolve({data:[]})
   ]);
@@ -1373,7 +1384,7 @@ async function openDrawer(custId){
         <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
       </div>
       ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
-      ${salesDetailHTML(c, itemStats, recoRows)}
+      ${salesDetailHTML(c, itemStats, recoRows, itemStatsSku)}
       <div class="panel">
         <div class="panel-h"><h3>월별 주문금액</h3><span class="note">${chartRows.length}개월</span></div>
         ${hasAnyOrders ? monthRangeChips(custMonthsAll, custRange, 'custChartSeg') : ''}
