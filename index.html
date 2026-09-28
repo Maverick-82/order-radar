@@ -132,9 +132,26 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 .meta{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:4px;font-size:12.5px;color:var(--ink-2)}
 .order{border-top:1px solid var(--line);padding:10px 0}
 .order:first-child{border-top:0}
+.order.click{cursor:pointer;margin-inline:-8px;padding-inline:8px;border-radius:8px}
+.order.click:hover{background:var(--surface-2)}
 .order-h{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline}
 .order-h .amt{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
 .order .ship{font-size:12px;color:var(--ink-2);white-space:pre-wrap;word-break:break-all;margin-top:3px}
+/* order detail modal */
+.omodal-scrim{position:fixed;inset:0;background:rgba(10,14,20,.5);z-index:50}
+.omodal{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(480px,92vw);max-height:88vh;overflow-y:auto;background:var(--surface);border-radius:14px;box-shadow:var(--shadow);z-index:51}
+.omodal-h{display:flex;align-items:flex-start;gap:10px;padding:16px 18px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--surface)}
+.omodal-h .ttl{flex:1;min-width:0}
+.omodal-h h3{font-size:15px;word-break:keep-all}
+.omodal-b{padding:14px 18px 20px;display:grid;gap:14px}
+.info-row{font-size:13px;display:grid;grid-template-columns:56px 1fr;gap:8px}
+.info-row .l{color:var(--muted)}
+.info-row .v{word-break:break-all}
+.contact-phones{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}
+.contact-phones a{color:var(--accent-ink);text-decoration:none;font-weight:600;border:1px solid var(--accent-soft);background:var(--accent-soft);border-radius:999px;padding:2px 10px;font-size:12.5px}
+.contact-phones a:hover{text-decoration:underline}
+.omodal-total{display:flex;justify-content:space-between;align-items:baseline;font-weight:700;padding-top:8px;border-top:1px solid var(--line)}
+.quicklog{display:grid;gap:8px;border:1px dashed var(--line-2);border-radius:8px;padding:10px 12px;background:var(--surface-2)}
 .log-item{display:grid;gap:3px;padding:9px 0;border-bottom:1px solid var(--line)}
 .log-item:last-child{border-bottom:0}
 .log-h{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px}
@@ -268,6 +285,19 @@ const fmtDate = d => d ? d : '-';
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const eok = n => ((Number(n)||0)/1e8).toFixed(2)+'억';
 function daysAgoStr(n){ if(n==null) return '-'; if(n<=0) return '오늘'; return n+'일 전'; }
+// 주문서의 담당자 필드는 "김성준 010-2914-2422", "백마리아 차장 02-399-1082 / 010-5282-8548",
+// "복지후생담당관실 박준우 행정관 02-3480-1942/010-2387-5635" 처럼 이름(+직함/부서)과 전화번호가
+// 한 줄에 자유롭게 섞여 있어서, 전화번호만 뽑아내 바로 누를 수 있는 링크로 만들고 나머지를 담당자 이름으로 씀.
+function parseContact(raw){
+  if(!raw || !String(raw).trim()) return null;
+  const s = String(raw).trim();
+  const phoneRe = /(01[016789][-.\s]?\d{3,4}[-.\s]?\d{4}|0[2-6][0-9]?[-.\s]?\d{3,4}[-.\s]?\d{4})/g;
+  const phones = [...new Set((s.match(phoneRe)||[]).map(p=>p.trim()))];
+  let name = s;
+  phones.forEach(p=>{ name = name.split(p).join(' '); });
+  name = name.replace(/[\/,·]/g,' ').replace(/\s+/g,' ').trim();
+  return {name, phones, raw:s};
+}
 function toast(msg){
   const t = document.getElementById('toast'); if(!t) return;
   t.textContent = msg; t.hidden = false;
@@ -1006,12 +1036,12 @@ async function renderContactOutcome(){
   body.innerHTML = '<div class="spin">불러오는 중...</div>';
   const {data: acts, error} = await sb.from('activities')
     .select('id,customer_id,kind,note,created_at,author_id,profiles(name),customers(name)')
-    .in('kind', ['call','visit'])
+    .in('kind', ['call','visit','sms'])
     .order('created_at', {ascending:false})
     .limit(500);
   if(error){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   if(!acts || acts.length===0){
-    body.innerHTML = `<div class="panel"><div class="panel-h"><h2>연락 성과</h2></div><p class="lede small muted">아직 기록된 통화·방문이 없어요. 거래처 상세에서 통화·방문 기록을 남기면 여기서 성공률을 볼 수 있어요.</p></div>`;
+    body.innerHTML = `<div class="panel"><div class="panel-h"><h2>연락 성과</h2></div><p class="lede small muted">아직 기록된 통화·방문·문자가 없어요. 거래처 상세에서 기록을 남기면 여기서 성공률을 볼 수 있어요.</p></div>`;
     return;
   }
   const custIds = [...new Set(acts.map(a=>a.customer_id))];
@@ -1041,7 +1071,7 @@ async function renderContactOutcome(){
 
   body.innerHTML = `
     <div class="panel">
-      <div class="panel-h"><h2>연락 성과</h2><span class="note">통화·방문 후 ${OUTCOME_WINDOW_DAYS}일 이내 주문이 들어오면 "성공"으로 판단</span></div>
+      <div class="panel-h"><h2>연락 성과</h2><span class="note">통화·방문·문자 후 ${OUTCOME_WINDOW_DAYS}일 이내 주문이 들어오면 "성공"으로 판단</span></div>
       <div class="kpis">
         <div class="kpi"><div class="l">총 접촉</div><div class="v">${num(total)}</div></div>
         <div class="kpi"><div class="l">성공</div><div class="v">${num(ok)}</div></div>
@@ -1062,7 +1092,7 @@ async function renderContactOutcome(){
         <thead><tr><th>날짜</th><th>거래처</th><th>구분</th><th>담당자</th><th>결과</th></tr></thead>
         <tbody>${rows.slice(0,100).map(r=>`<tr class="click" data-id="${r.customer_id}">
           <td>${r.ds}</td><td>${esc((r.customers&&r.customers.name)||'')}</td>
-          <td>${r.kind==='call'?'전화':r.kind==='visit'?'방문':'메모'}</td>
+          <td>${LOG_TYPE[r.kind]||r.kind}</td>
           <td>${esc((r.profiles&&r.profiles.name)||'')}</td>
           <td>${outcomeBadge(r.outcome)}</td>
         </tr>`).join('')}</tbody>
@@ -1154,6 +1184,23 @@ function salesDetailHTML(c, itemStats, recoRows){
   </div>`;
 }
 
+// orders 테이블은 한 품목이 한 줄이라, 같은 날짜+주문번호(order_no)를 묶어야 실제 주문 1건이 됨.
+// order_no가 없는 옛날 데이터는 그냥 각 줄을 독립된 주문으로 취급.
+function groupOrders(orders){
+  const map = new Map();
+  (orders||[]).forEach(o=>{
+    const key = (o.order_no!=null && o.order_no!=='') ? `${o.order_date}__${o.order_no}` : `row_${o.id}`;
+    if(!map.has(key)) map.set(key, {order_date:o.order_date, order_no:o.order_no, address:o.address, contact:o.contact, delivery_note:o.delivery_note, summary:o.summary, status:o.status, items:[], total:0});
+    const g = map.get(key);
+    g.items.push(o);
+    g.total += Number(o.supply_amount)||0;
+  });
+  return [...map.values()].sort((a,b)=>{
+    if(a.order_date!==b.order_date) return a.order_date<b.order_date?1:-1;
+    return (Number(b.order_no)||0)-(Number(a.order_no)||0);
+  });
+}
+
 async function openDrawer(custId){
   const c = custById.get(custId);
   if(!c) return;
@@ -1174,7 +1221,7 @@ async function openDrawer(custId){
   host.querySelector('.x').onclick = close;
 
   const [{data: orders}, {data: acts}, {data: allOrders}, months, {data: itemStats}, {data: recoRows}] = await Promise.all([
-    sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).limit(30),
+    sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).order('order_no', {ascending:false}).limit(150),
     sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
     sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId),
     ensureMonthsLoaded().catch(()=>[]),
@@ -1189,6 +1236,67 @@ async function openDrawer(custId){
     ? months.map(m=>({month: m.month, amount: byMonth.get(m.month)||0}))
     : [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month,amount}));
   let custRange = 'recent';
+  // 주문(orders) 테이블은 한 줄이 "한 주문의 품목 하나"라서, 같은 날짜·같은 주문번호(order_no)끼리
+  // 묶어야 실제 "주문 1건"이 됨 — 최근 주문 목록은 이 묶음 단위로 보여주고, 클릭하면 그 주문에 속한
+  // 품목 전체와 배송지·담당자 연락처를 한번에 보여줌.
+  const orderGroups = groupOrders(orders).slice(0,25);
+
+  // 주문 상세(품목 전체 + 담당자 연락처)를 팝업으로 보여주고, 그 자리에서 바로 통화·방문·문자
+  // 기록을 남길 수 있게 함 — 저장하면 드로어 아래쪽 "통화·방문 기록" 목록도 바로 갱신됨.
+  function openOrderDetail(g){
+    const mount = document.createElement('div');
+    document.body.appendChild(mount);
+    const contact = parseContact(g.contact);
+    const closeModal = ()=>{ mount.remove(); };
+    mount.innerHTML = `<div class="omodal-scrim"></div>
+      <div class="omodal">
+        <div class="omodal-h">
+          <div class="ttl">
+            <h3>${esc(c.name)}</h3>
+            <div class="meta">${esc(g.order_date||'')}${g.order_no!=null?` · 주문번호 ${esc(g.order_no)}`:''} ${g.status?`<span class="pill s-idle">${esc(g.status)}</span>`:''}</div>
+          </div>
+          <button class="x" aria-label="닫기">✕</button>
+        </div>
+        <div class="omodal-b">
+          ${g.address ? `<div class="info-row"><div class="l">배송지</div><div class="v">${esc(g.address)}</div></div>` : ''}
+          <div class="info-row"><div class="l">담당자</div><div class="v">
+            ${contact ? `${esc(contact.name||'-')}${contact.phones.length ? `<div class="contact-phones">${contact.phones.map(p=>`<a href="tel:${p.replace(/[^0-9]/g,'')}">📞 ${esc(p)}</a>`).join('')}</div>` : ''}` : `<span class="small muted">등록된 연락처가 없어요</span>`}
+          </div></div>
+          ${g.delivery_note ? `<div class="info-row"><div class="l">비고</div><div class="v small muted">${esc(g.delivery_note)}</div></div>` : ''}
+          <div class="tbl-wrap"><table><thead><tr><th>품목</th><th class="num">수량</th><th class="num">금액</th></tr></thead><tbody>
+            ${g.items.map(it=>`<tr><td>${esc(it.item_name||'')}</td><td class="num">${num(it.quantity)}</td><td class="num">${won(it.supply_amount)}</td></tr>`).join('')}
+          </tbody></table></div>
+          <div class="omodal-total"><span>총 금액</span><span>${won(g.total)}</span></div>
+          <div class="quicklog">
+            <div class="small muted">지금 연락했다면 바로 기록을 남기세요</div>
+            <div class="row">
+              <select id="oq-kind">
+                <option value="call">전화</option>
+                <option value="visit">방문</option>
+                <option value="sms">문자</option>
+              </select>
+            </div>
+            <textarea id="oq-note" placeholder="통화·방문·문자 내용을 남겨주세요"></textarea>
+            <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="oq-submit">기록 남기기</button></div>
+            <div id="oq-msg"></div>
+          </div>
+        </div>
+      </div>`;
+    mount.querySelector('.omodal-scrim').onclick = closeModal;
+    mount.querySelector('.x').onclick = closeModal;
+    mount.querySelector('#oq-submit').onclick = async ()=>{
+      const kind = mount.querySelector('#oq-kind').value;
+      const note = mount.querySelector('#oq-note').value.trim();
+      const msg = mount.querySelector('#oq-msg');
+      if(!note){ msg.innerHTML = '<div class="err small">내용을 입력해주세요.</div>'; return; }
+      const {error} = await sb.from('activities').insert({customer_id: custId, kind, note});
+      if(error){ msg.innerHTML = `<div class="err small">저장 실패: ${esc(error.message)}</div>`; return; }
+      toast('기록을 남겼어요');
+      closeModal();
+      const {data: acts2} = await sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false});
+      renderLogSection(custId, acts2||[], orderDates);
+    };
+  }
 
   const body = document.getElementById('drawerBody');
   if(!body) return; // drawer already closed
@@ -1211,14 +1319,15 @@ async function openDrawer(custId){
         ${hasAnyOrders ? monthBars(chartRows) : '<p class="small muted">주문 이력이 없습니다.</p>'}
       </div>
       <div class="panel">
-        <div class="panel-h"><h3>최근 주문 (${orders?orders.length:0}건)</h3></div>
-        ${(orders||[]).map(o=>`<div class="order">
-          <div class="order-h"><b>${o.order_date}</b> <span class="small muted">${esc(o.item_name||'')}</span> <span class="amt">${won(o.supply_amount)}</span></div>
-          ${o.address?`<div class="ship">${esc(o.address)}</div>`:''}
+        <div class="panel-h"><h3>최근 주문 (${orderGroups.length}건)</h3><span class="note">눌러서 품목·담당자 연락처 보기</span></div>
+        ${orderGroups.map((g,i)=>`<div class="order click" data-og="${i}">
+          <div class="order-h"><b>${esc(g.order_date||'')}</b> <span class="small muted">품목 ${g.items.length}개${g.summary?` · ${esc(g.summary)}`:''}</span> <span class="amt">${won(g.total)}</span></div>
+          ${g.address?`<div class="ship">${esc(g.address)}</div>`:''}
         </div>`).join('') || '<p class="small muted">주문 이력이 없습니다.</p>'}
       </div>
       <div class="panel" id="logPanel"></div>`;
     body.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ custRange = b.dataset.yr; drawBody(); });
+    body.querySelectorAll('[data-og]').forEach(el=> el.onclick = ()=> openOrderDetail(orderGroups[Number(el.dataset.og)]) );
     renderLogSection(custId, acts||[], orderDates);
   }
   drawBody();
@@ -1228,18 +1337,18 @@ function renderLogSection(custId, acts, orderDates){
   const panel = document.getElementById('logPanel');
   if(!panel) return;
   panel.innerHTML = `
-    <div class="panel-h"><h3>통화·방문 기록</h3><span class="note">${acts.length}건</span></div>
+    <div class="panel-h"><h3>통화·방문·문자 기록</h3><span class="note">${acts.length}건</span></div>
     <div id="logList">${acts.map(a=>logItemHTML(a, orderDates)).join('') || '<p class="small muted">아직 기록이 없습니다.</p>'}</div>
     <div class="log-form" style="margin-top:12px">
       <div class="row">
         <select id="log-kind">
           <option value="call">전화</option>
           <option value="visit">방문</option>
-          <option value="memo">메모</option>
+          <option value="sms">문자</option>
         </select>
         <label class="small">다음 연락 예정일 <input type="date" id="log-next"></label>
       </div>
-      <textarea id="log-note" placeholder="통화·방문 내용을 남겨주세요"></textarea>
+      <textarea id="log-note" placeholder="통화·방문·문자 내용을 남겨주세요"></textarea>
       <div style="display:flex;justify-content:flex-end"><button class="btn primary" id="log-submit">기록 남기기</button></div>
       <div id="log-msg"></div>
     </div>`;
@@ -1269,7 +1378,7 @@ function renderLogSection(custId, acts, orderDates){
   };
 }
 
-const LOG_TYPE = {call:'전화', visit:'방문', memo:'메모'};
+const LOG_TYPE = {call:'전화', visit:'방문', sms:'문자'};
 function logItemHTML(a, orderDates){
   const ds = a.created_at.slice(0,10);
   const outcome = computeOutcome(ds, orderDates);
