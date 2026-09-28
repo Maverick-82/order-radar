@@ -245,7 +245,6 @@ dl.defs dd{margin:0;color:var(--ink-2)}
     <button data-tab="customers" aria-selected="false">거래처</button>
     <button data-tab="sales" aria-selected="false">영업</button>
     <button data-tab="forecast" aria-selected="false">재주문 예측</button>
-    <button data-tab="items" aria-selected="false">품목</button>
     <button data-tab="products" aria-selected="false">제품가격</button>
   </nav>
 </header>
@@ -254,7 +253,6 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 <section class="view hide" id="view-customers"></section>
 <section class="view hide" id="view-sales"></section>
 <section class="view hide" id="view-forecast"></section>
-<section class="view hide" id="view-items"></section>
 <section class="view hide" id="view-products"></section>
 </div>
 
@@ -296,7 +294,7 @@ let CUSTS = []; // customer_stats rows, loaded once per session
 let custById = new Map();
 let currentTab = 'summary';
 let currentSalesSub = 'priority';
-const VIEW_IDS = ['summary','customers','sales','forecast','items','products'];
+const VIEW_IDS = ['summary','customers','sales','forecast','products'];
 
 // ---------------- Auth ----------------
 const authBoxes = ['loginBox','signupBox','forgotBox','resetBox'];
@@ -403,7 +401,6 @@ function renderTab(){
   else if(currentTab==='customers') renderCustomersView();
   else if(currentTab==='sales') renderSalesView();
   else if(currentTab==='forecast') renderForecastView();
-  else if(currentTab==='items') renderItemsView();
   else if(currentTab==='products') renderProductsView();
 }
 
@@ -497,19 +494,62 @@ function gotoCustomersByStatus(status){
   window.scrollTo(0,0);
 }
 
+// ---------------- 품목 이름 정리 (특가/공동구매 등 태그 제거 후 동일 품목 합산) ----------------
+// "특가(25년강남서초연간)-복사용지 A4/80g [2,500매]", "복사용지 A4/80g - 공동구매 [2,500매]",
+// "복사용지 A4/80g(2,500매) [2,500매]" 처럼 실제로는 같은 품목인데 주문서에 붙는 태그·중복 표기 때문에
+// 다른 이름으로 집계되던 것들을 하나로 합쳐서 보여주기 위한 정리 함수. 무게·규격·친환경 여부처럼
+// 실제로 다른 품목을 가리키는 표기는 건드리지 않는다.
+function normalizeItemName(raw){
+  const s = String(raw||'').trim();
+  const m = s.match(/^(.*?)(\s*\[[^\]]+\])?$/s);
+  let base = (m && m[1] ? m[1] : s).trim();
+  const bracket = (m && m[2]) ? m[2].trim() : '';
+  base = base.replace(/^특가\([^)]*\)\s*-\s*/, '').replace(/^특가\s*-\s*/, '');
+  base = base.replace(/\s*-\s*(공동구매|교육청)\s*$/, '');
+  if(bracket){
+    const bc = bracket.replace(/^\[|\]$/g, '').trim();
+    const escRe = bc.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    base = base.replace(new RegExp('\\(' + escRe + '\\)\\s*$'), '').trim();
+  }
+  return bracket ? (base + ' ' + bracket) : base;
+}
+let itemTotalsCache = null;
+async function ensureItemTotalsLoaded(){
+  if(itemTotalsCache) return itemTotalsCache;
+  const {data, error} = await sb.from('item_totals').select('*').order('amount', {ascending:false}).limit(1500);
+  if(error){ itemTotalsCache = []; throw error; }
+  itemTotalsCache = data || [];
+  return itemTotalsCache;
+}
+function topMergedItems(rows, n){
+  const byName = new Map();
+  (rows||[]).forEach(r=>{
+    const key = normalizeItemName(r.item_name);
+    if(!byName.has(key)) byName.set(key, {item_name:key, amount:0, qty:0});
+    const e = byName.get(key);
+    e.amount += Number(r.amount)||0;
+    e.qty += Number(r.qty)||0;
+  });
+  return [...byName.values()].sort((a,b)=>b.amount-a.amount).slice(0,n);
+}
+
 // ---------------- 요약 ----------------
 let summaryRange = 'recent';
 
 async function renderSummaryView(){
   const el = document.getElementById('view-summary');
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
-  try{ await ensureMonthsLoaded(); }
+  let itemRows = [];
+  try{
+    const [, items] = await Promise.all([ensureMonthsLoaded(), ensureItemTotalsLoaded()]);
+    itemRows = items;
+  }
   catch(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   const totalAmount = CUSTS.reduce((s,c)=>s+(Number(c.total_amount)||0),0);
   const totalOrders = CUSTS.reduce((s,c)=>s+(Number(c.order_count)||0),0);
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
   const byType = {}; CUSTS.forEach(c=>byType[c.ctype||'미분류']=(byType[c.ctype||'미분류']||0)+(Number(c.total_amount)||0));
-  const topCust = CUSTS.slice(0,10);
+  const topItems = topMergedItems(itemRows, 12);
   const [a,b] = monthRangeBounds(summaryMonths, summaryRange);
   const chartRows = summaryMonths.slice(a,b);
   el.innerHTML = `
@@ -531,11 +571,10 @@ async function renderSummaryView(){
   </div>
   <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
     ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
-  <div class="panel"><div class="panel-h"><h2>주문금액 상위 거래처</h2><span class="note">클릭하면 상세</span></div>
-    <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>상태</th><th class="num">누적금액</th><th class="num">주문</th></tr></thead><tbody>
-    ${topCust.map(c=>`<tr class="click" data-id="${c.customer_id}"><td>${esc(c.name)}</td><td>${statusPill(c.status)}</td><td class="num">${won(c.total_amount)}</td><td class="num">${num(c.order_count)}</td></tr>`).join('')}
+  <div class="panel"><div class="panel-h"><h2>주요 품목</h2><span class="note">누적금액 상위 · 특가·공동구매 등 표기만 다른 동일 품목은 합산</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>품목</th><th class="num">누적금액</th><th class="num">수량</th></tr></thead><tbody>
+    ${topItems.map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
-  el.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
   el.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ summaryRange = b.dataset.yr; renderSummaryView(); });
   el.querySelectorAll('[data-goto-st]').forEach(b=> b.onclick = ()=> gotoCustomersByStatus(b.dataset.gotoSt) );
 }
@@ -567,35 +606,6 @@ async function renderForecastView(){
     </tbody></table></div></div>`;
   el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ forecastWindow=+b.dataset.w; renderForecastView(); });
   el.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
-}
-
-// ---------------- 품목 ----------------
-let itemQuery = '';
-async function renderItemsView(){
-  const el = document.getElementById('view-items');
-  el.innerHTML = '<div class="spin">불러오는 중...</div>';
-  const {data, error} = await sb.from('item_totals').select('*').order('amount', {ascending:false}).limit(1500);
-  if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
-  const all = data||[];
-  el.innerHTML = `<div class="panel">
-    <div class="panel-h"><h2>품목별 주문금액</h2><span class="note" id="itemsCount"></span></div>
-    <div class="filters"><input type="search" id="iq" placeholder="품목명 검색" value="${esc(itemQuery)}"></div>
-    <div id="itemsResult" style="margin-top:10px"></div>
-  </div>`;
-  // 입력창을 매 키 입력마다 새로 그리면 포커스가 날아가서 글자가 안 눌리는 것처럼 보여요 —
-  // 그래서 입력창은 그대로 두고, 결과 영역만 갱신합니다.
-  function draw(){
-    const q = itemQuery.trim().toLowerCase();
-    const list = q ? all.filter(i=>i.item_name.toLowerCase().includes(q)) : all;
-    document.getElementById('itemsCount').textContent = `${num(list.length)}개 품목`;
-    document.getElementById('itemsResult').innerHTML = `
-      <div class="tbl-wrap"><table><thead><tr><th>품목</th><th class="num">금액</th><th class="num">수량</th><th class="num">주문</th><th class="num">거래처</th></tr></thead><tbody>
-      ${list.slice(0,300).map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td><td class="num">${num(i.order_count)}</td><td class="num">${num(i.customer_count)}</td></tr>`).join('')}
-      </tbody></table></div>
-      ${list.length>300?`<div class="small muted" style="margin-top:8px">검색 결과 ${num(list.length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>`:''}`;
-  }
-  document.getElementById('iq').oninput = (e)=>{ itemQuery=e.target.value; draw(); };
-  draw();
 }
 
 // ---------------- 제품가격 (자사 판매상품 카탈로그 · ablemarket.or.kr 기준 정적 데이터, 잉크/토너 제외) ----------------
