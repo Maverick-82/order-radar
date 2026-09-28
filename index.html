@@ -82,6 +82,18 @@ tr.click:hover td{background:var(--surface-2)}
 .btn.primary:hover{background:var(--accent-ink)}
 .btn:disabled{opacity:.5;cursor:default}
 .subnav{display:flex;flex-wrap:wrap;gap:6px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,380px),1fr));gap:18px}
+.grid2 > *{min-width:0}
+.hbars{display:grid;gap:7px}
+.hbar{display:grid;grid-template-columns:minmax(80px,150px) 1fr auto;gap:10px;align-items:center;font-size:13px}
+.hbar .t{height:14px;background:var(--surface-2);border-radius:3px;overflow:hidden}
+.hbar .t b{display:block;height:100%;background:var(--bar);border-radius:0 3px 3px 0}
+.hbar .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vbars{display:flex;align-items:flex-end;gap:4px;height:160px;padding-top:10px}
+.vbars .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
+.vbars .bar{width:70%;background:var(--bar);border-radius:3px 3px 0 0;min-height:1px}
+.vbars .lbl{font-size:10.5px;color:var(--muted);margin-top:4px;white-space:nowrap}
+.explain{background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,14,20,.38);z-index:40}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(880px,100%);background:var(--bg);z-index:41;box-shadow:var(--shadow);display:flex;flex-direction:column}
@@ -189,13 +201,19 @@ tr.click:hover td{background:var(--surface-2)}
     </div>
   </div>
   <nav class="tabs" id="tabs">
-    <button data-tab="customers" aria-selected="true">거래처</button>
+    <button data-tab="summary" aria-selected="true">요약</button>
+    <button data-tab="customers" aria-selected="false">거래처</button>
     <button data-tab="sales" aria-selected="false">영업</button>
+    <button data-tab="forecast" aria-selected="false">재주문 예측</button>
+    <button data-tab="items" aria-selected="false">품목</button>
   </nav>
 </header>
 
-<section class="view" id="view-customers"></section>
+<section class="view" id="view-summary"></section>
+<section class="view hide" id="view-customers"></section>
 <section class="view hide" id="view-sales"></section>
+<section class="view hide" id="view-forecast"></section>
+<section class="view hide" id="view-items"></section>
 </div>
 
 <div id="drawerHost"></div>
@@ -217,8 +235,9 @@ function statusPill(st){ return `<span class="pill ${STATUS_CLS[st]||'s-idle'}">
 let ME = null; // {id, name, role}
 let CUSTS = []; // customer_stats rows, loaded once per session
 let custById = new Map();
-let currentTab = 'customers';
+let currentTab = 'summary';
 let currentSalesSub = 'priority';
+const VIEW_IDS = ['summary','customers','sales','forecast','items'];
 
 // ---------------- Auth ----------------
 const authBoxes = ['loginBox','signupBox','forgotBox','resetBox'];
@@ -316,14 +335,16 @@ document.getElementById('tabs').addEventListener('click', (e)=>{
   const b = e.target.closest('button[data-tab]'); if(!b) return;
   currentTab = b.dataset.tab;
   [...document.querySelectorAll('#tabs button')].forEach(x=>x.setAttribute('aria-selected', x===b));
-  document.getElementById('view-customers').classList.toggle('hide', currentTab!=='customers');
-  document.getElementById('view-sales').classList.toggle('hide', currentTab!=='sales');
+  VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', currentTab!==id));
   renderTab();
 });
 
 function renderTab(){
-  if(currentTab==='customers') renderCustomersView();
-  else renderSalesView();
+  if(currentTab==='summary') renderSummaryView();
+  else if(currentTab==='customers') renderCustomersView();
+  else if(currentTab==='sales') renderSalesView();
+  else if(currentTab==='forecast') renderForecastView();
+  else if(currentTab==='items') renderItemsView();
 }
 
 // ---------------- Data load ----------------
@@ -333,6 +354,108 @@ async function loadCustomers(){
   if(error){ document.getElementById('view-customers').innerHTML = `<div class="panel err">불러오기 실패: ${esc(error.message)}</div>`; return; }
   CUSTS = data || [];
   custById = new Map(CUSTS.map(c=>[c.customer_id, c]));
+}
+
+// ---------------- shared chart helpers ----------------
+function hbars(rows, max){
+  max = max || Math.max(...rows.map(r=>r.v),1);
+  return `<div class="hbars">${rows.map(r=>`<div class="hbar"><span class="nm" title="${esc(r.n)}">${esc(r.n)}</span><span class="t"><b style="width:${Math.max(0,r.v/max*100).toFixed(1)}%"></b></span><span class="num small">${r.s}</span></div>`).join('')}</div>`;
+}
+function monthBars(rows){
+  const max = Math.max(...rows.map(r=>Number(r.amount)||0),1);
+  return `<div class="vbars">${rows.map(r=>{
+    const h = Math.max(2, Math.round((Number(r.amount)||0)/max*140));
+    const lbl = r.month.slice(2,7).replace('-','.');
+    return `<div class="col" title="${esc(lbl)} · ${won(r.amount)}"><div class="bar" style="height:${h}px"></div><div class="lbl">${esc(lbl)}</div></div>`;
+  }).join('')}</div>`;
+}
+
+// ---------------- 요약 ----------------
+async function renderSummaryView(){
+  const el = document.getElementById('view-summary');
+  el.innerHTML = '<div class="spin">불러오는 중...</div>';
+  const {data: months, error} = await sb.from('monthly_order_totals').select('*').order('month', {ascending:true});
+  if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  const totalAmount = CUSTS.reduce((s,c)=>s+(Number(c.total_amount)||0),0);
+  const totalOrders = CUSTS.reduce((s,c)=>s+(Number(c.order_count)||0),0);
+  const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
+  const byType = {}; CUSTS.forEach(c=>byType[c.ctype||'미분류']=(byType[c.ctype||'미분류']||0)+(Number(c.total_amount)||0));
+  const topCust = CUSTS.slice(0,10);
+  const recent = (months||[]).slice(-12);
+  el.innerHTML = `
+  <div class="kpis">
+    <div class="kpi"><div class="l">누적 주문금액</div><div class="v">${won(totalAmount)}</div></div>
+    <div class="kpi"><div class="l">거래처</div><div class="v">${num(CUSTS.length)}곳</div></div>
+    <div class="kpi"><div class="l">주문 (누적)</div><div class="v">${num(totalOrders)}건</div></div>
+    <div class="kpi"><div class="l">주문 늦어진 거래처</div><div class="v" style="color:var(--bad)">${num((byStatus['이탈의심']||0)+(byStatus['주의']||0))}곳</div><div class="s">이탈의심 ${byStatus['이탈의심']||0} · 주의 ${byStatus['주의']||0}</div></div>
+  </div>
+  <div class="panel">
+    <div class="panel-h"><h2>월별 주문금액</h2><span class="note">최근 ${recent.length}개월</span></div>
+    ${recent.length? monthBars(recent) : '<p class="small muted">데이터가 없습니다.</p>'}
+  </div>
+  <div class="grid2">
+    <div class="panel"><div class="panel-h"><h2>상태별 거래처</h2></div>
+      <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="pill ${STATUS_CLS[k]||'s-idle'}">${esc(k)} ${v}곳</span>`).join(' ')}</div></div>
+    <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
+      ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
+  </div>
+  <div class="panel"><div class="panel-h"><h2>주문금액 상위 거래처</h2><span class="note">클릭하면 상세</span></div>
+    <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>상태</th><th class="num">누적금액</th><th class="num">주문</th></tr></thead><tbody>
+    ${topCust.map(c=>`<tr class="click" data-id="${c.customer_id}"><td>${esc(c.name)}</td><td>${statusPill(c.status)}</td><td class="num">${won(c.total_amount)}</td><td class="num">${num(c.order_count)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  el.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+}
+
+// ---------------- 재주문 예측 ----------------
+let forecastWindow = 30;
+async function renderForecastView(){
+  const el = document.getElementById('view-forecast');
+  el.innerHTML = '<div class="spin">불러오는 중...</div>';
+  const end = new Date(); end.setDate(end.getDate()+forecastWindow);
+  const start = new Date(); start.setDate(start.getDate()-21);
+  const {data, error} = await sb.from('item_customer_stats').select('*')
+    .neq('status','끊김의심')
+    .gte('next_date', start.toISOString().slice(0,10))
+    .lte('next_date', end.toISOString().slice(0,10))
+    .order('next_date', {ascending:true})
+    .limit(500);
+  if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  const PST = {'정상':'s-idle','임박':'s-info','지연':'s-warn','끊김의심':'s-bad'};
+  const rows = (data||[]).map(r=>({...r, cname:(custById.get(r.customer_id)||{}).name || ''}));
+  el.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>곧 재주문할 것으로 보이는 곳</h2>
+      <div class="seg">${[14,30,60].map(w=>`<button data-w="${w}" aria-pressed="${w===forecastWindow}">${w}일 이내</button>`).join('')}</div></div>
+    <p class="explain">품목별로 3번 이상 주기적으로 산 이력이 있으면 <b>평소 주문 간격</b>으로 다음 주문일을 예상했어요. 재고 준비나 먼저 연락하는 데 쓰세요. '지연'은 예상일이 조금 지난 곳이에요 — 오래 지난 곳은 영업 탭의 '품목 끊김'에서 볼 수 있어요.</p>
+    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건 예상</div>
+    <div class="tbl-wrap"><table><thead><tr><th class="num">예상일</th><th>거래처</th><th>품목</th><th class="num">보통수량</th><th class="num">주기</th><th class="num hide-sm">마지막 주문</th><th>상태</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td class="num">${r.next_date}</td><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${num(r.usual_qty)}</td><td class="num">${r.cycle_days}일</td><td class="num hide-sm">${r.last_date}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  el.querySelectorAll('[data-w]').forEach(b=>b.onclick=()=>{ forecastWindow=+b.dataset.w; renderForecastView(); });
+  el.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+}
+
+// ---------------- 품목 ----------------
+let itemQuery = '';
+async function renderItemsView(){
+  const el = document.getElementById('view-items');
+  el.innerHTML = '<div class="spin">불러오는 중...</div>';
+  const {data, error} = await sb.from('item_totals').select('*').order('amount', {ascending:false}).limit(1500);
+  if(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  const all = data||[];
+  function draw(){
+    const q = itemQuery.trim().toLowerCase();
+    const list = q ? all.filter(i=>i.item_name.toLowerCase().includes(q)) : all;
+    el.innerHTML = `<div class="panel">
+      <div class="panel-h"><h2>품목별 주문금액</h2><span class="note">${num(list.length)}개 품목</span></div>
+      <div class="filters"><input type="search" id="iq" placeholder="품목명 검색" value="${esc(itemQuery)}"></div>
+      <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>품목</th><th class="num">금액</th><th class="num">수량</th><th class="num">주문</th><th class="num">거래처</th></tr></thead><tbody>
+      ${list.slice(0,300).map(i=>`<tr><td>${esc(i.item_name)}</td><td class="num">${won(i.amount)}</td><td class="num">${num(i.qty)}</td><td class="num">${num(i.order_count)}</td><td class="num">${num(i.customer_count)}</td></tr>`).join('')}
+      </tbody></table></div>
+      ${list.length>300?`<div class="small muted" style="margin-top:8px">검색 결과 ${num(list.length)}건 중 300건만 표시 — 검색어를 더 입력해보세요.</div>`:''}
+    </div>`;
+    document.getElementById('iq').oninput = (e)=>{ itemQuery=e.target.value; draw(); };
+  }
+  draw();
 }
 
 // ---------------- Customers view ----------------
@@ -397,6 +520,10 @@ function renderSalesView(){
         <button data-s="priority" aria-pressed="${currentSalesSub==='priority'}">영업 우선순위</button>
         <button data-s="churn" aria-pressed="${currentSalesSub==='churn'}">이탈 감지</button>
         <button data-s="contact" aria-pressed="${currentSalesSub==='contact'}">연락 성과</button>
+        <button data-s="itemstop" aria-pressed="${currentSalesSub==='itemstop'}">품목 끊김</button>
+        <button data-s="reco" aria-pressed="${currentSalesSub==='reco'}">추가구매 추천</button>
+        <button data-s="program" aria-pressed="${currentSalesSub==='program'}">공동구매 미참여</button>
+        <button data-s="gift" aria-pressed="${currentSalesSub==='gift'}">명절선물 고객</button>
       </div>
     </div>
     <div id="salesBody"></div>`;
@@ -404,9 +531,103 @@ function renderSalesView(){
     const b = e.target.closest('button[data-s]'); if(!b) return;
     currentSalesSub = b.dataset.s; renderSalesView();
   };
-  if(currentSalesSub==='priority') renderPriority();
-  else if(currentSalesSub==='churn') renderChurn();
-  else renderContactOutcome();
+  ({priority:renderPriority, churn:renderChurn, contact:renderContactOutcome, itemstop:renderItemStop, reco:renderReco, program:renderProgram, gift:renderGift})[currentSalesSub]();
+}
+
+async function renderItemStop(){
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
+  const activeIds = new Set(CUSTS.filter(c=>c.status==='활성'||c.status==='신규').map(c=>c.customer_id));
+  const {data, error} = await sb.from('item_customer_stats').select('*')
+    .in('status', ['끊김의심','지연'])
+    .order('total_amount', {ascending:false})
+    .limit(1000);
+  if(error){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  const PST = {'정상':'s-idle','임박':'s-info','지연':'s-warn','끊김의심':'s-bad'};
+  const rows = (data||[]).filter(r=>activeIds.has(r.customer_id)).map(r=>({...r, cname:(custById.get(r.customer_id)||{}).name||''})).slice(0,300);
+  body.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>거래는 계속되는데 특정 품목만 끊긴 곳</h2></div>
+    <p class="explain">거래처는 여전히 주문 중인데(상태: 활성·신규), 전에는 주기적으로 사던 품목을 한동안 안 사고 있어요. <b>다른 업체에서 사고 있을 가능성</b>이 있어 확인이 필요한 곳이에요.</p>
+    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건</div>
+    <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>품목</th><th class="num">이전 주기</th><th class="num">마지막 구매</th><th class="num">누적 금액</th><th>상태</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${r.cycle_days}일 (${r.order_count}회)</td><td class="num">${r.last_date}<div class="small muted">${r.since_days}일 전</div></td><td class="num">${won(r.total_amount)}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+}
+
+async function renderReco(){
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
+  const candidates = CUSTS.filter(c=>!['이탈의심','휴면','일회성'].includes(c.status)).sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,150);
+  const ctypes = [...new Set(candidates.map(c=>c.ctype).filter(Boolean))];
+  const [{data: pen, error: penErr}, {data: haveRows, error: haveErr}] = await Promise.all([
+    sb.from('item_type_penetration').select('*').in('ctype', ctypes).order('penetration_pct', {ascending:false}).limit(3000),
+    sb.from('item_customer_stats').select('customer_id,item_name').in('customer_id', candidates.map(c=>c.customer_id))
+  ]);
+  if(penErr){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(penErr.message)}</div>`; return; }
+  const haveByCust = new Map();
+  (haveRows||[]).forEach(r=>{ if(!haveByCust.has(r.customer_id)) haveByCust.set(r.customer_id, new Set()); haveByCust.get(r.customer_id).add(r.item_name); });
+  const penByType = new Map();
+  (pen||[]).forEach(r=>{ if(!penByType.has(r.ctype)) penByType.set(r.ctype, []); penByType.get(r.ctype).push(r); });
+  const rows = candidates.map(c=>{
+    const have = haveByCust.get(c.customer_id) || new Set();
+    const opts = (penByType.get(c.ctype)||[]).filter(r=>!have.has(r.item_name)).slice(0,3);
+    return {c, opts};
+  }).filter(r=>r.opts.length);
+  body.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>추가구매 추천</h2></div>
+    <p class="explain">같은 유형 기관이 많이 사는데 <b>이 거래처는 아직 우리에게 안 산 품목</b>이에요. '동종 구매율'은 같은 유형 거래처 중 그 품목을 산 비율입니다. 매출이 큰 거래처부터, 현재 거래 중인 곳만 보여줍니다.</p>
+    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}곳</div>
+    <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th class="num">누적 금액</th><th>추천 1순위</th><th>추천 2순위</th><th class="hide-sm">추천 3순위</th></tr></thead><tbody>
+    ${rows.map(r=>{ const cell = x => x?`<b>${esc(x.item_name)}</b><div class="small muted">동종 ${x.penetration_pct}%</div>`:''; return `<tr class="click" data-id="${r.c.customer_id}"><td>${esc(r.c.name)} <span class="tag">${esc(r.c.ctype||'')}</span></td><td class="num">${won(r.c.total_amount)}</td><td>${cell(r.opts[0])}</td><td>${cell(r.opts[1])}</td><td class="hide-sm">${cell(r.opts[2])}</td></tr>`; }).join('')}
+    </tbody></table></div></div>`;
+  body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+}
+
+async function renderProgram(){
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
+  const {data, error} = await sb.from('edu_office_program').select('*').order('edu_office');
+  if(error){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  let sel = (data && data[0]) ? data[0].edu_office : null;
+  function draw(){
+    const cur = data.find(e=>e.edu_office===sel);
+    const ids = (cur.non_participant_ids||[]).map(id=>custById.get(id)).filter(Boolean).sort((a,b)=>(b.total_amount||0)-(a.total_amount||0));
+    body.innerHTML = `<div class="panel">
+      <div class="panel-h"><h2>교육지원청별 공동구매·연간단가 참여 현황</h2></div>
+      <p class="explain">교육지원청 소속 거래처 중, 해당 교육지원청의 공동구매나 연간단가(특가) 품목을 <b>한 번도 주문하지 않은 곳</b>이에요. 다음 공동구매 안내 대상입니다. (마지막 데이터 갱신 시점 기준)</p>
+      <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>교육지원청</th><th class="num">거래처</th><th class="num">참여</th><th class="num">미참여</th><th>참여율</th><th class="num">누적 금액</th></tr></thead><tbody>
+      ${data.map(e=>`<tr class="click" data-eo="${esc(e.edu_office)}" ${e.edu_office===sel?'style="background:var(--accent-soft)"':''}><td>${esc(e.edu_office)}</td><td class="num">${e.total_customers}</td><td class="num">${e.participating}</td><td class="num">${e.total_customers-e.participating}</td><td class="num">${Math.round(e.participating/e.total_customers*100)}%</td><td class="num">${won(e.total_amount)}</td></tr>`).join('')}
+      </tbody></table></div></div>
+      <div class="panel"><div class="panel-h"><h2>${esc(sel)} 교육지원청 미참여 거래처 ${num(ids.length)}곳</h2></div>
+      <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>상태</th><th class="num">누적 금액</th></tr></thead><tbody>
+      ${ids.map(c=>`<tr class="click" data-id="${c.customer_id}"><td>${esc(c.name)}</td><td>${statusPill(c.status)}</td><td class="num">${won(c.total_amount)}</td></tr>`).join('')}
+      </tbody></table></div></div>`;
+    body.querySelectorAll('[data-eo]').forEach(r=>r.onclick=()=>{ sel=r.dataset.eo; draw(); });
+    body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
+  }
+  if(!data || !data.length){ body.innerHTML = '<div class="panel"><p class="small muted">데이터가 없습니다.</p></div>'; return; }
+  draw();
+}
+
+async function renderGift(){
+  const body = document.getElementById('salesBody');
+  body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
+  const {data, error} = await sb.from('gift_customers').select('*');
+  if(error){ body.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
+  const rows = (data||[]).map(r=>({...r, c: custById.get(r.customer_id)})).filter(r=>r.c);
+  const onlySeol = rows.filter(r=>r.seol_amount>0 && r.chuseok_amount<=0);
+  const rest = rows.filter(r=>!(r.seol_amount>0 && r.chuseok_amount<=0));
+  onlySeol.sort((a,b)=>(b.seol_amount)-(a.seol_amount));
+  rest.sort((a,b)=>((b.seol_amount||0)+(b.chuseok_amount||0))-((a.seol_amount||0)+(a.chuseok_amount||0)));
+  const ordered = onlySeol.concat(rest);
+  body.innerHTML = `<div class="panel">
+    <div class="panel-h"><h2>명절 선물세트 구매 거래처</h2></div>
+    <p class="explain">설·추석 선물세트를 주문한 곳이에요. <b>가장 최근 설엔 샀는데 그 다음 추석엔 안 산 곳 ${num(onlySeol.length)}곳</b>은 위쪽에 모았어요 — 다음 설 영업 리스트로 쓰세요.</p>
+    <div class="tbl-wrap" style="margin-top:10px"><table><thead><tr><th>거래처</th><th class="num">최근 설</th><th class="num">최근 추석</th><th class="num">누적 금액</th></tr></thead><tbody>
+    ${ordered.map(r=>`<tr class="click" data-id="${r.customer_id}"><td>${esc(r.c.name)} ${r.seol_amount>0&&r.chuseok_amount<=0?'<span class="pill s-warn">추석 미구매</span>':''}</td><td class="num">${r.seol_amount?won(r.seol_amount):'—'}</td><td class="num">${r.chuseok_amount?won(r.chuseok_amount):'—'}</td><td class="num">${won(r.c.total_amount)}</td></tr>`).join('')}
+    </tbody></table></div></div>`;
+  body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
 }
 
 function renderPriority(){
