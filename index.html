@@ -93,7 +93,19 @@ tr.click:hover td{background:var(--surface-2)}
 .vbars .col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0}
 .vbars .bar{width:70%;background:var(--bar);border-radius:3px 3px 0 0;min-height:1px}
 .vbars .lbl{font-size:10.5px;color:var(--muted);margin-top:4px;white-space:nowrap}
+.vbars .val{font-size:10px;color:var(--muted);margin-bottom:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .explain{background:var(--surface-2);border-radius:8px;padding:10px 12px;font-size:12.5px;color:var(--ink-2)}
+.explain b{color:var(--ink)}
+.chip-row{display:flex;flex-wrap:wrap;gap:6px}
+.chip{font:inherit;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:999px;padding:3px 11px;cursor:pointer}
+.chip[aria-pressed="true"]{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
+details.help summary{cursor:pointer;color:var(--accent-ink);font-size:13px}
+details.help[open] summary{margin-bottom:8px}
+dl.defs{display:grid;grid-template-columns:max-content 1fr;gap:4px 12px;margin:0;font-size:12.5px}
+dl.defs dt{font-weight:600}
+dl.defs dd{margin:0;color:var(--ink-2)}
+.rowhd{white-space:nowrap;font-size:11.5px;font-weight:600;color:var(--muted)}
+.toast{position:fixed;bottom:calc(20px + env(safe-area-inset-bottom,0px));left:50%;transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:13px;z-index:60}
 /* drawer */
 .scrim{position:fixed;inset:0;background:rgba(10,14,20,.38);z-index:40}
 .drawer{position:fixed;top:0;right:0;bottom:0;width:min(880px,100%);background:var(--bg);z-index:41;box-shadow:var(--shadow);display:flex;flex-direction:column}
@@ -217,6 +229,7 @@ tr.click:hover td{background:var(--surface-2)}
 </div>
 
 <div id="drawerHost"></div>
+<div id="toast" class="toast" hidden></div>
 
 <script>
 const SUPABASE_URL = "https://hevlgbkkzrambtkqfbka.supabase.co";
@@ -227,7 +240,23 @@ const won = n => (n==null? '-' : Math.round(n).toLocaleString('ko-KR')+'원');
 const num = n => (n==null? '-' : Math.round(n).toLocaleString('ko-KR'));
 const fmtDate = d => d ? d : '-';
 const esc = s => (s==null?'':String(s)).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const eok = n => ((Number(n)||0)/1e8).toFixed(2)+'억';
 function daysAgoStr(n){ if(n==null) return '-'; if(n<=0) return '오늘'; return n+'일 전'; }
+function toast(msg){
+  const t = document.getElementById('toast'); if(!t) return;
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(()=>{ t.hidden = true; }, 1800);
+}
+function copyTSV(rows, label){
+  const txt = rows.map(r=>r.map(v=>String(v??'').replace(/[\t\n\r]+/g,' ')).join('\t')).join('\n');
+  const done = () => toast(`${label} ${rows.length-1}행 복사됨 · 엑셀에 붙여넣기 하세요`);
+  try{ navigator.clipboard.writeText(txt).then(done, fallback); }catch(e){ fallback(); }
+  function fallback(){
+    const ta=document.createElement('textarea'); ta.value=txt; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); done(); }catch(e){ toast('복사가 막혀 있어요. 표를 드래그해서 복사하세요'); }
+    ta.remove();
+  }
+}
 
 const STATUS_CLS = {'활성':'s-good','신규':'s-info','주의':'s-warn','이탈의심':'s-bad','휴면':'s-idle','일회성':'s-idle'};
 function statusPill(st){ return `<span class="pill ${STATUS_CLS[st]||'s-idle'}">${esc(st||'-')}</span>`; }
@@ -372,10 +401,41 @@ function hbars(rows, max){
 function monthBars(rows){
   const max = Math.max(...rows.map(r=>Number(r.amount)||0),1);
   return `<div class="vbars">${rows.map(r=>{
-    const h = Math.max(2, Math.round((Number(r.amount)||0)/max*140));
+    const amt = Number(r.amount)||0;
+    const h = Math.max(2, Math.round(amt/max*140));
     const lbl = r.month.slice(2,7).replace('-','.');
-    return `<div class="col" title="${esc(lbl)} · ${won(r.amount)}"><div class="bar" style="height:${h}px"></div><div class="lbl">${esc(lbl)}</div></div>`;
+    return `<div class="col" title="${esc(lbl)} · ${won(r.amount)}"><div class="val">${amt?eok(amt):''}</div><div class="bar" style="height:${h}px"></div><div class="lbl">${esc(lbl)}</div></div>`;
   }).join('')}</div>`;
+}
+function monthTable(rows){
+  if(!rows.length) return '';
+  return `<div class="tbl-wrap" style="margin-top:12px"><table><thead><tr><th class="rowhd">월</th>${rows.map(r=>`<th class="num">${esc(r.month.slice(2,7).replace('-','.'))}</th>`).join('')}</tr></thead><tbody>
+    <tr><td class="rowhd">금액</td>${rows.map(r=>`<td class="num">${won(r.amount)}</td>`).join('')}</tr>
+    <tr><td class="rowhd">주문건수</td>${rows.map(r=>`<td class="num">${num(r.order_count)}</td>`).join('')}</tr>
+    <tr><td class="rowhd">거래처수</td>${rows.map(r=>`<td class="num">${num(r.customer_count)}</td>`).join('')}</tr>
+  </tbody></table></div>`;
+}
+function statusHelpBlock(){
+  return `<details class="help" style="margin-top:12px"><summary>상태·주기는 이렇게 판정했어요</summary>
+  <dl class="defs">
+  <dt>기준일</dt><dd>오늘 날짜 기준으로 실시간 계산돼요.</dd>
+  <dt>주문 주기</dt><dd>주문한 날짜 사이 간격의 중앙값이에요. 같은 날 여러 건은 1회로 셉니다.</dd>
+  <dt>${statusPill('신규')}</dt><dd>첫 주문이 90일 이내이고, 지금까지 주문일수가 2회 이하</dd>
+  <dt>${statusPill('활성')}</dt><dd>주문 3회 이상 — 경과일 ≤ 주기×1.5(최소 35일) · 주문 2회 — 경과일 ≤ 75일</dd>
+  <dt>${statusPill('주의')}</dt><dd>주문 3회 이상 — 경과일 ≤ 주기×3(최소 75일) · 주문 2회 — 경과일 ≤ 120일</dd>
+  <dt>${statusPill('이탈의심')}</dt><dd>주문 3회 이상인데 경과일이 주기×3, 75일을 모두 넘음</dd>
+  <dt>${statusPill('휴면')}</dt><dd>주문 2회만 하고 그 뒤 120일 넘게 주문 없음</dd>
+  <dt>${statusPill('일회성')}</dt><dd>전체 기간 통틀어 1번만 주문 (최근 90일 이내 신규는 아님)</dd>
+  <dt>학교 주의점</dt><dd>학교는 방학(7~8월)·예산 시기 때문에 주문이 끊겨 보일 수 있어요. 이탈의심은 '연락해볼 후보'로 보세요.</dd>
+  </dl></details>`;
+}
+function gotoCustomersByStatus(status){
+  custStatusFilter = status;
+  currentTab = 'customers';
+  document.querySelectorAll('#tabs button[data-tab]').forEach(x=> x.setAttribute('aria-selected', String(x.dataset.tab==='customers')));
+  VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', id!=='customers'));
+  renderTab();
+  window.scrollTo(0,0);
 }
 
 // ---------------- 요약 ----------------
@@ -429,20 +489,23 @@ async function renderSummaryView(){
     <div class="panel-h"><h2>월별 주문금액</h2><span class="note">${chartRows.length}개월</span></div>
     ${summaryChips()}
     ${chartRows.length? monthBars(chartRows) : '<p class="small muted">데이터가 없습니다.</p>'}
+    ${monthTable(chartRows)}
   </div>
-  <div class="grid2">
-    <div class="panel"><div class="panel-h"><h2>상태별 거래처</h2></div>
-      <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<span class="pill ${STATUS_CLS[k]||'s-idle'}">${esc(k)} ${v}곳</span>`).join(' ')}</div></div>
-    <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
-      ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
+  <div class="panel"><div class="panel-h"><h2>거래처 상태 분포</h2><span class="note">기준일 ${todayStr()} · 클릭하면 목록</span></div>
+    <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<button class="chip" data-goto-st="${esc(k)}">${statusPill(k)} ${v}곳</button>`).join('')}</div>
+    ${statusHelpBlock()}
   </div>
+  <div class="panel"><div class="panel-h"><h2>유형별 누적매출 상위</h2></div>
+    ${hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})))}</div>
   <div class="panel"><div class="panel-h"><h2>주문금액 상위 거래처</h2><span class="note">클릭하면 상세</span></div>
     <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>상태</th><th class="num">누적금액</th><th class="num">주문</th></tr></thead><tbody>
     ${topCust.map(c=>`<tr class="click" data-id="${c.customer_id}"><td>${esc(c.name)}</td><td>${statusPill(c.status)}</td><td class="num">${won(c.total_amount)}</td><td class="num">${num(c.order_count)}</td></tr>`).join('')}
     </tbody></table></div></div>`;
   el.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
   el.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ summaryRange = b.dataset.yr; renderSummaryView(); });
+  el.querySelectorAll('[data-goto-st]').forEach(b=> b.onclick = ()=> gotoCustomersByStatus(b.dataset.gotoSt) );
 }
+function todayStr(){ return new Date().toISOString().slice(0,10); }
 
 // ---------------- 재주문 예측 ----------------
 let forecastWindow = 30;
@@ -668,22 +731,57 @@ async function renderGift(){
   body.querySelectorAll('tr[data-id]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.id)) );
 }
 
+// 기관유형별로 "지금이 연락하기 좋은 시점"인지: 학교류는 방학 끝난 신학기 초(3월·9월), 공공기관류는
+// 예산 집행 초반(3~4월)과 연말 예산 소진기(9~12월)를 좋은 타이밍으로 봄. 복지시설·기업 등 정해진
+// 주기가 뚜렷하지 않은 유형은 타이밍 보너스를 주지 않음.
+const TIMING_GOOD_MONTHS = {
+  '유치원·어린이집':[3,9], '초등학교':[3,9], '중학교':[3,9], '고등학교':[3,9], '특수·기타학교':[3,9], '교육청·도서관':[3,9],
+  '구청':[3,4,9,10,11,12], '서울시 본청·사업소':[3,4,9,10,11,12], '중앙부처·공공기관':[3,4,9,10,11,12],
+  '공사·공단':[3,4,9,10,11,12], '동주민센터':[3,4,9,10,11,12], '소방':[3,4,9,10,11,12], '경찰':[3,4,9,10,11,12], '법무·사법':[3,4,9,10,11,12],
+};
+function timingGood(ctype){ const months = TIMING_GOOD_MONTHS[ctype]; return months ? months.includes(new Date().getMonth()+1) : false; }
+// 우선순위 점수 = 상태(위험도) × 금액(로그스케일, 큰 곳으로 쏠리지 않게) × 경과 정도(주기 대비 얼마나 늦었는지) × 타이밍 보너스
+function priorityScore(c){
+  const riskW = {'이탈의심':3, '주의':2, '휴면':1.3, '일회성':0.8}[c.status] || 0;
+  const amtScore = Math.log10((Number(c.total_amount)||0)+10000);
+  const md_ = Number(c.typical_cycle_days)||0;
+  const sn = Number(c.days_since_last_order)||0;
+  const overdue = md_ ? Math.min(sn/md_, 6) : 1.5;
+  return riskW * amtScore * (1 + overdue*0.15) * (timingGood(c.ctype) ? 1.2 : 1);
+}
+let priorityOnlyTiming = false;
 function renderPriority(){
   const body = document.getElementById('salesBody');
-  const list = CUSTS.filter(c=>c.status==='주의'||c.status==='이탈의심').sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,80);
+  const want = ['이탈의심','주의','휴면','일회성'];
+  let list = CUSTS.filter(c=>want.includes(c.status));
+  if(priorityOnlyTiming) list = list.filter(c=>timingGood(c.ctype));
+  list = list.slice().sort((a,b)=>priorityScore(b)-priorityScore(a)).slice(0,40);
   body.innerHTML = `<div class="panel">
-    <div class="panel-h"><h2>영업 우선순위</h2><span class="note">상태가 주의·이탈의심이면서 누적매출이 큰 순 (상위 ${list.length}곳)</span></div>
+    <div class="panel-h"><h2>오늘의 영업 우선순위</h2><div class="filters">
+      <label class="small muted" style="display:flex;gap:6px;align-items:center"><input type="checkbox" id="onlyTiming" ${priorityOnlyTiming?'checked':''}> 지금 타이밍 좋은 곳만</label>
+      <button class="btn" id="pcopy">목록 복사</button></div></div>
+    <p class="explain">상태(이탈의심·주의·휴면·일회성) · 얼마나 늦어졌는지 · 누적 금액 · 기관유형별 연락 타이밍을 종합해서 <b>오늘 먼저 연락해볼 만한 순서</b>로 매겼어요. 학교는 방학 끝난 직후(3월·9월), 공공기관은 예산 집행 초반과 연말 소진기를 '타이밍 좋음'으로 봤어요.</p>
+    <div class="small muted" style="margin:10px 0 6px">상위 ${list.length}곳</div>
     <div class="tbl-wrap"><table>
-      <thead><tr><th>거래처</th><th>상태</th><th class="num">누적매출</th><th class="num">최근주문</th><th class="num">평소주기</th></tr></thead>
-      <tbody>${list.map(c=>`<tr class="click" data-id="${c.customer_id}">
-        <td>${esc(c.name)}</td><td>${statusPill(c.status)}</td>
+      <thead><tr><th class="num">순위</th><th>거래처</th><th>상태</th><th>타이밍</th><th class="num">누적매출</th><th class="num">최근주문</th></tr></thead>
+      <tbody>${list.map((c,ri)=>`<tr class="click" data-id="${c.customer_id}">
+        <td class="num">${ri+1}</td>
+        <td>${esc(c.name)}<div class="small muted">${esc(c.ctype||'')}</div></td>
+        <td>${statusPill(c.status)}</td>
+        <td>${timingGood(c.ctype)?'<span class="pill s-good">지금 좋음</span>':'<span class="small muted">—</span>'}</td>
         <td class="num">${won(c.total_amount)}</td>
         <td class="num">${daysAgoStr(c.days_since_last_order)}</td>
-        <td class="num">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일' : '-'}</td>
       </tr>`).join('')}</tbody>
     </table></div>
   </div>`;
   body.querySelector('table').onclick = (e)=>{ const tr=e.target.closest('tr[data-id]'); if(tr) openDrawer(Number(tr.dataset.id)); };
+  document.getElementById('onlyTiming').onchange = (e)=>{ priorityOnlyTiming = e.target.checked; renderPriority(); };
+  document.getElementById('pcopy').onclick = ()=>{
+    const rows = [['순위','거래처','기관유형','상태','타이밍','누적매출','최근주문']].concat(
+      list.map((c,ri)=>[ri+1, c.name, c.ctype||'', c.status, timingGood(c.ctype)?'좋음':'', Math.round(c.total_amount||0), c.last_date||''])
+    );
+    copyTSV(rows, '영업 우선순위');
+  };
 }
 
 function renderChurn(){
@@ -799,6 +897,46 @@ function outcomeBadge(o){
 }
 
 // ---------------- Drawer ----------------
+// ===== 영업 참고 (상세창) =====
+const SALES_TIP = {
+  '유치원·어린이집':'방학·행사철엔 주문이 자연스럽게 뜸해져요. 개학 직후나 명절 앞두고 연락하면 반응이 좋아요.',
+  '초등학교':'여름·겨울 방학엔 주문이 끊기는 게 정상이에요. 방학 끝난 직후가 연락하기 좋은 타이밍이에요.',
+  '중학교':'여름·겨울 방학엔 주문이 끊기는 게 정상이에요. 방학 끝난 직후가 연락하기 좋은 타이밍이에요.',
+  '고등학교':'여름·겨울 방학엔 주문이 끊기는 게 정상이에요. 방학 끝난 직후가 연락하기 좋은 타이밍이에요.',
+  '특수·기타학교':'방학 시즌 영향이 커요. 개학 시점에 맞춰 연락해보세요.',
+  '교육청·도서관':'예산 배정 시기(3~4월, 9월 전후)에 발주가 몰리는 경향이 있어요.',
+  '구청':'예산 소진기(11~12월)·새 회계연도 초(1~3월)를 참고해서 연락 타이밍을 잡아보세요.',
+  '서울시 본청·사업소':'예산 소진기(11~12월)·새 회계연도 초(1~3월)를 참고해서 연락 타이밍을 잡아보세요.',
+  '중앙부처·공공기관':'예산 소진기(11~12월)·새 회계연도 초(1~3월)를 참고해서 연락 타이밍을 잡아보세요.',
+  '공사·공단':'예산·입찰 일정에 영향을 받아요. 담당 부서 예산 편성 시기를 먼저 확인해보세요.',
+  '재단·협회':'사업·후원 예산에 따라 주문이 들쑥날쑥할 수 있어요.',
+  '복지시설':'후원금·지원 예산 상황에 따라 주문이 줄 수 있어요. 부담 없이 안부만 여쭤보는 톤이 좋아요.',
+  '의료·보건':'예산·입찰 주기를 먼저 확인해보세요.',
+  '소방':'예산 소진기(11~12월)를 참고해보세요.',
+  '경찰':'예산 소진기(11~12월)를 참고해보세요.',
+  '법무·사법':'예산 소진기(11~12월)를 참고해보세요.',
+  '기업':'담당자 교체나 구매 정책 변경 가능성을 먼저 확인해보세요.',
+};
+function salesTipHTML(c){
+  const md_ = c.typical_cycle_days!=null ? Math.round(c.typical_cycle_days) : null;
+  const sn = c.days_since_last_order;
+  let situation;
+  if(c.status==='이탈의심'){
+    situation = md_ ? `보통 ${md_}일마다 주문하시던 곳인데 ${sn}일째 소식이 없어요 (평소 주기의 ${(sn/md_).toFixed(1)}배).` : `${sn}일째 주문이 없어요.`;
+  } else if(c.status==='주의'){
+    situation = md_ ? `보통 ${md_}일 주기인데 지금 ${sn}일째로 살짝 늦어지고 있어요. 아직 이탈은 아니고 먼저 챙기면 좋은 단계예요.` : `주문이 평소보다 살짝 늦어지고 있어요 (${sn}일째).`;
+  } else if(c.status==='휴면'){
+    situation = `2번 주문 후 ${sn}일간 소식이 없어요. 초반 관계를 다시 살려볼 만한 곳이에요.`;
+  } else {
+    situation = `지금까지 딱 한 번(${c.last_date||''}) 주문하고 이어지지 않았어요. 그때 경험이 어땠는지 확인해볼 만해요.`;
+  }
+  const tip = SALES_TIP[c.ctype] || '주문 이력을 참고해서 자연스러운 타이밍에 연락해보세요.';
+  return `<div class="panel">
+    <div class="panel-h"><h3>영업 참고</h3><span class="note">전화·방문 전에 참고하세요</span></div>
+    <p class="explain">${esc(situation)}<br>💡 ${esc(tip)}</p>
+  </div>`;
+}
+
 async function openDrawer(custId){
   const c = custById.get(custId);
   if(!c) return;
@@ -818,11 +956,15 @@ async function openDrawer(custId){
   host.querySelector('.scrim').onclick = close;
   host.querySelector('.x').onclick = close;
 
-  const [{data: orders}, {data: acts}] = await Promise.all([
+  const [{data: orders}, {data: acts}, {data: allOrders}] = await Promise.all([
     sb.from('orders').select('*').eq('customer_id', custId).order('order_date', {ascending:false}).limit(30),
-    sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false})
+    sb.from('activities').select('id,kind,note,next_contact_date,created_at,author_id,profiles(name)').eq('customer_id', custId).order('created_at', {ascending:false}),
+    sb.from('orders').select('order_date,supply_amount').eq('customer_id', custId)
   ]);
   const orderDates = (orders||[]).map(o=>o.order_date);
+  const byMonth = new Map();
+  (allOrders||[]).forEach(o=>{ if(!o.order_date) return; const m = o.order_date.slice(0,7)+'-01'; byMonth.set(m, (byMonth.get(m)||0)+(Number(o.supply_amount)||0)); });
+  const custChartRows = [...byMonth.entries()].sort((a,b)=> a[0]<b[0]?-1:1).map(([month,amount])=>({month,amount}));
 
   const body = document.getElementById('drawerBody');
   if(!body) return; // drawer already closed
@@ -832,6 +974,11 @@ async function openDrawer(custId){
       <div class="kpi"><div class="l">주문수</div><div class="v">${num(c.order_count)}</div></div>
       <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
       <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
+    </div>
+    ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
+    <div class="panel">
+      <div class="panel-h"><h3>월별 주문금액</h3></div>
+      ${custChartRows.length? monthBars(custChartRows) : '<p class="small muted">주문 이력이 없습니다.</p>'}
     </div>
     <div class="panel">
       <div class="panel-h"><h3>최근 주문 (${orders?orders.length:0}건)</h3></div>
