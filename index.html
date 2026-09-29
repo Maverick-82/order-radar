@@ -105,6 +105,9 @@ tr.click:hover td{background:var(--surface-2)}
 .s-bad{color:var(--bad);background:var(--bad-soft)}
 .s-info{color:var(--accent-ink);background:var(--accent-soft)}
 .s-idle{color:var(--idle);background:var(--idle-soft)}
+.pill.b-big{color:var(--cat-orange);background:var(--cat-orange-soft)}
+.pill.b-return{color:var(--cat-violet);background:var(--cat-violet-soft)}
+.pill.b-first{color:var(--cat-aqua);background:var(--cat-aqua-soft)}
 .tag{display:inline-block;font-size:11px;color:var(--ink-2);background:var(--surface-2);border-radius:4px;padding:0 6px;white-space:nowrap;line-height:18px}
 .period-tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:3px 10px 3px 9px;white-space:nowrap}
 .count-tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:3px 10px;white-space:nowrap}
@@ -721,19 +724,23 @@ async function renderSummaryView(){
   const startNext = `${nextD.getFullYear()}-${pad(nextD.getMonth()+1)}-01`;
   const prevD = new Date(now.getFullYear(), now.getMonth()-1, 1);
   const startPrev = `${prevD.getFullYear()}-${pad(prevD.getMonth()+1)}-01`;
-  let itemRows = [], curOrderCount = 0, prevOrderCount = 0, monthActs = [];
+  let itemRows = [], curOrderCount = 0, prevOrderCount = 0, monthActs = [], monthOrders = [];
   try{
-    const [, items, , curCnt, prevCnt, actsRes] = await Promise.all([
+    const [, items, , curCnt, prevCnt, actsRes, notableRes] = await Promise.all([
       ensureMonthsLoaded(), ensureItemTotalsLoaded(), ensureCustYearTotalsLoaded(),
       rawOrderCount(startCur, startNext), rawOrderCount(startPrev, startCur),
       sb.from('activities').select('id,kind,customer_id,note,created_at,customers(name)')
         .gte('created_at', startCur).lt('created_at', startNext)
-        .order('created_at', {ascending:false}).limit(300)
+        .order('created_at', {ascending:false}).limit(300),
+      sb.from('order_notability').select('*')
+        .gte('order_date', startCur).lt('order_date', startNext)
+        .order('amount', {ascending:false}).limit(500)
     ]);
     itemRows = items;
     curOrderCount = curCnt;
     prevOrderCount = prevCnt;
     monthActs = (actsRes && actsRes.data) || [];
+    monthOrders = (notableRes && notableRes.data) || [];
   }
   catch(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
@@ -761,6 +768,28 @@ async function renderSummaryView(){
   const newCustomersThisMonth = CUSTS.filter(c=>c.first_date && c.first_date.slice(0,7)===nowYM).length;
   const actKindCount = {call:0, visit:0, sms:0};
   monthActs.forEach(a=>{ if(actKindCount[a.kind]!=null) actKindCount[a.kind]++; });
+  // 이번달 "주목할 만한 주문" — 사람이 표를 하나하나 훑지 않으면 놓치기 쉬운 신호 3가지를 자동으로 골라냄:
+  // 1) 금액 자체가 크거나 그 거래처 평소 평균보다 훨씬 큰 주문, 2) 한동안 뜸했던 거래처가 다시 주문, 3) 꽤 큰 금액으로 시작한 첫 거래.
+  const NOTABLE_BIG_ABS = 20000000, NOTABLE_BIG_REL = 2.5, NOTABLE_RETURN_GAP = 120, NOTABLE_FIRST_MIN = 5000000;
+  const notableOrders = monthOrders.map(o=>{
+    const amt = Number(o.amount)||0, avg = Number(o.cust_avg_amount)||0, n = Number(o.cust_order_n)||0;
+    const gap = o.gap_days!=null ? Number(o.gap_days) : null;
+    const badges = [], why = [];
+    if(amt>=NOTABLE_BIG_ABS || (n>1 && avg>0 && amt>=avg*NOTABLE_BIG_REL)){
+      badges.push({cls:'b-big', label:'고액 주문'});
+      if(n>1 && avg>0) why.push(`평소 평균(${eok(avg)}원)의 ${(amt/avg).toFixed(1)}배`);
+    }
+    if(gap!=null && gap>=NOTABLE_RETURN_GAP){
+      badges.push({cls:'b-return', label:`${Math.round(gap/30)}개월만에 복귀`});
+      why.push(`직전 주문(${o.prev_order_date}) 이후 ${num(gap)}일만`);
+    }
+    if(o.prev_order_date==null && amt>=NOTABLE_FIRST_MIN){
+      badges.push({cls:'b-first', label:'첫 거래'});
+      why.push('이 거래처와의 첫 주문');
+    }
+    if(!badges.length) return null;
+    return {customer_id:o.customer_id, customer_name:o.customer_name, order_date:o.order_date, amount:amt, badges, why: why.join(' · ')};
+  }).filter(Boolean).sort((x,y)=>y.amount-x.amount).slice(0,6);
   el.innerHTML = `
   <div class="kpis">
     <div class="kpi"><div class="l">주문금액 (${rangeLabel(summaryRange)})</div><div class="v">${won(rangeAmount)}</div></div>
@@ -786,6 +815,15 @@ async function renderSummaryView(){
     </div>
     ${Number(curMonthRow.amount)?'':'<p class="small muted" style="margin-top:10px">이번 달 주문 데이터가 아직 없어요.</p>'}
   </div>
+  </div>
+  <div class="panel"><div class="panel-h"><h2>이번달 주목할 만한 주문</h2><span class="period-tag">${esc(nowYM)} 기준</span></div>
+    ${notableOrders.length ? `
+    <div class="notable-list">
+      ${notableOrders.map(o=>`<div class="order click" data-goto-cust="${o.customer_id}">
+        <div class="order-h"><b>${esc(o.customer_name)}</b> ${o.badges.map(b=>`<span class="pill ${b.cls}">${esc(b.label)}</span>`).join('')} <span class="amt">${won(o.amount)}</span></div>
+        <div class="ship">${esc(o.order_date)} · ${esc(o.why)}</div>
+      </div>`).join('')}
+    </div>` : `<p class="small muted">이번달은 특별히 두드러지는 주문이 없어요. (평소보다 훨씬 크거나, 오래 뜸했다 돌아왔거나, 큰 금액으로 시작한 첫 거래를 자동으로 찾아드려요)</p>`}
   </div>
   <div class="panel"><div class="panel-h"><h2>이번달 영업 활동</h2><span class="period-tag">${esc(nowYM)} · ${dayOfMonth}일째</span></div>
     <div class="kpis">
