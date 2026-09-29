@@ -23,6 +23,8 @@
   --bar:#2563eb; --bar-muted:#b7d3f6; --shadow:0 8px 30px rgba(20,30,50,.14);
   --cat-aqua:#1baf7a; --cat-aqua-soft:#dbf2e9; --cat-orange:#eb6834; --cat-orange-soft:#fbe4d9; --cat-violet:#4a3aa7; --cat-violet-soft:#e7e3f8;
   --cat-yellow:#eda100; --cat-yellow-soft:#fbedd1; --cat-magenta:#e87ba4; --cat-magenta-soft:#fbe4ec; --cat-green:#008300; --cat-green-soft:#dcefdc;
+  --chart-1:#93b4ef; --chart-2:#f3b98d; --chart-3:#8fd0bd; --chart-4:#f2cf8d; --chart-5:#eeaac6; --chart-6:#a9d6a4; --chart-7:#bcb2ec;
+  --chart-accent:#8fabe8; --chart-accent-ink:#6f8fd4;
   --card-shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 10px rgba(16,24,40,.06);
   --card-shadow-hover:0 6px 20px rgba(16,24,40,.10), 0 2px 6px rgba(16,24,40,.06);
   --font:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
@@ -34,6 +36,8 @@
   --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
   --cat-aqua:#199e70; --cat-aqua-soft:#132e26; --cat-orange:#d95926; --cat-orange-soft:#3a2416; --cat-violet:#9085e9; --cat-violet-soft:#241f47;
   --cat-yellow:#c98500; --cat-yellow-soft:#332a10; --cat-magenta:#d55181; --cat-magenta-soft:#3a1f29; --cat-green:#008300; --cat-green-soft:#173517;
+  --chart-1:#7fa3e0; --chart-2:#d99f6e; --chart-3:#6fb89f; --chart-4:#cfab60; --chart-5:#cf85a7; --chart-6:#84b87e; --chart-7:#a294dd;
+  --chart-accent:#7fa3e0; --chart-accent-ink:#5f85c8;
   --card-shadow:0 1px 2px rgba(0,0,0,.24), 0 2px 10px rgba(0,0,0,.3);
   --card-shadow-hover:0 6px 22px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
   --bar:#5b93ef; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; } }
@@ -43,6 +47,8 @@
   --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
   --cat-aqua:#199e70; --cat-aqua-soft:#132e26; --cat-orange:#d95926; --cat-orange-soft:#3a2416; --cat-violet:#9085e9; --cat-violet-soft:#241f47;
   --cat-yellow:#c98500; --cat-yellow-soft:#332a10; --cat-magenta:#d55181; --cat-magenta-soft:#3a1f29; --cat-green:#008300; --cat-green-soft:#173517;
+  --chart-1:#7fa3e0; --chart-2:#d99f6e; --chart-3:#6fb89f; --chart-4:#cfab60; --chart-5:#cf85a7; --chart-6:#84b87e; --chart-7:#a294dd;
+  --chart-accent:#7fa3e0; --chart-accent-ink:#5f85c8;
   --card-shadow:0 1px 2px rgba(0,0,0,.24), 0 2px 10px rgba(0,0,0,.3);
   --card-shadow-hover:0 6px 22px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
   --bar:#5b93ef; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; }
@@ -153,7 +159,7 @@ tr.click:hover td{background:var(--accent-soft)}
 .vbars-wrap{overflow-x:auto}
 .vbars{display:flex;align-items:flex-end;gap:7px;height:160px;padding-top:10px}
 .vbars .col{flex:1 1 0;min-width:34px;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%}
-.vbars .bar{width:62%;background:linear-gradient(180deg,var(--accent) 0%,var(--accent-ink) 100%);border-radius:6px 6px 0 0;min-height:2px;transition:filter .12s}
+.vbars .bar{width:62%;background:linear-gradient(180deg,var(--chart-accent) 0%,var(--chart-accent-ink) 100%);border-radius:6px 6px 0 0;min-height:2px;transition:filter .12s}
 .vbars .col:hover .bar{filter:brightness(1.08)}
 .vbars .lbl{font-size:10.5px;color:var(--muted);margin-top:5px;white-space:nowrap}
 .vbars .val{font-size:11px;font-weight:600;color:var(--ink-2);margin-bottom:3px;white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -516,13 +522,13 @@ async function loadCustomers(){
 // ---------------- shared chart helpers ----------------
 // opts.cat=true: 서로 다른 항목(유형 등)을 구분하는 목적이면 항목마다 다른 색(카테고리 색)을 씀.
 // opts.cat 없으면(기본): 순위 비교가 목적이라 한 가지 색(블루)의 짙기만 순위에 따라 달라짐 — 1위가 가장 진함.
-const CAT_HUES = ['var(--accent)','var(--cat-orange)','var(--cat-aqua)','var(--cat-yellow)','var(--cat-magenta)','var(--cat-green)','var(--cat-violet)'];
+const CAT_HUES = ['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-4)','var(--chart-5)','var(--chart-6)','var(--chart-7)'];
 function hbars(rows, opts){
   opts = opts || {};
   const max = opts.max || Math.max(...rows.map(r=>r.v),1);
   const n = rows.length;
   return `<div class="hbars">${rows.map((r,i)=>{
-    const color = opts.cat ? CAT_HUES[i % CAT_HUES.length] : 'var(--accent)';
+    const color = opts.cat ? CAT_HUES[i % CAT_HUES.length] : 'var(--chart-accent)';
     const op = opts.cat ? 1 : Math.max(0.4, 1 - (n>1? i/(n-1) : 0)*0.55).toFixed(2);
     return `<div class="hbar${r.id!=null?' click':''}"${r.id!=null?` data-hb-id="${r.id}"`:''}><span class="nm" title="${esc(r.n)}">${esc(r.n)}</span><span class="t"><b style="width:${Math.max(0,r.v/max*100).toFixed(1)}%;background:${color};opacity:${op}"></b></span><span class="num small">${r.s}</span></div>`;
   }).join('')}</div>`;
@@ -531,7 +537,7 @@ function hbars(rows, opts){
 // "부분 대 전체" 구성비를 보여줄 땐 파이차트 대신 스택바 형태로 다르게 표현.
 function stackbar(rows, capN){
   capN = capN || 7;
-  const CAT = ['var(--accent)','var(--cat-orange)','var(--cat-aqua)','var(--cat-yellow)','var(--cat-magenta)','var(--cat-green)','var(--cat-violet)'];
+  const CAT = ['var(--chart-1)','var(--chart-2)','var(--chart-3)','var(--chart-4)','var(--chart-5)','var(--chart-6)','var(--chart-7)'];
   const sorted = rows.slice().sort((a,b)=>b.v-a.v);
   const top = sorted.slice(0, capN);
   const restRows = sorted.slice(capN);
