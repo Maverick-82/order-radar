@@ -700,13 +700,40 @@ function summaryTopCustomers(range, n){
     .map(c=>({n:c.name, v:Number(c.total_amount)||0, s:won(c.total_amount), id:c.customer_id}));
 }
 
+// orders 테이블은 주문 1건에 품목이 여러 줄이면 같은 order_no가 여러 행으로 찍혀요.
+// monthly_order_totals.order_count는 distinct order_no라 "총 주문건수"보다 작게 보일 수 있어서,
+// 대시보드의 "당월 주문수"는 중복 제거 없이 orders 원본 행 수(count exact, head)를 그대로 씁니다.
+async function rawOrderCount(startISO, endExclusiveISO){
+  const {count, error} = await sb.from('orders').select('id', {count:'exact', head:true})
+    .gte('order_date', startISO).lt('order_date', endExclusiveISO);
+  if(error) return 0;
+  return count || 0;
+}
 async function renderSummaryView(){
   const el = document.getElementById('view-summary');
   el.innerHTML = '<div class="spin">불러오는 중...</div>';
-  let itemRows = [];
+  const now = new Date();
+  const pad = n=>String(n).padStart(2,'0');
+  const nowYM = `${now.getFullYear()}-${pad(now.getMonth()+1)}`;
+  const dayOfMonth = now.getDate();
+  const startCur = `${nowYM}-01`;
+  const nextD = new Date(now.getFullYear(), now.getMonth()+1, 1);
+  const startNext = `${nextD.getFullYear()}-${pad(nextD.getMonth()+1)}-01`;
+  const prevD = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const startPrev = `${prevD.getFullYear()}-${pad(prevD.getMonth()+1)}-01`;
+  let itemRows = [], curOrderCount = 0, prevOrderCount = 0, monthActs = [];
   try{
-    const [, items] = await Promise.all([ensureMonthsLoaded(), ensureItemTotalsLoaded(), ensureCustYearTotalsLoaded()]);
+    const [, items, , curCnt, prevCnt, actsRes] = await Promise.all([
+      ensureMonthsLoaded(), ensureItemTotalsLoaded(), ensureCustYearTotalsLoaded(),
+      rawOrderCount(startCur, startNext), rawOrderCount(startPrev, startCur),
+      sb.from('activities').select('id,kind,customer_id,note,created_at,customers(name)')
+        .gte('created_at', startCur).lt('created_at', startNext)
+        .order('created_at', {ascending:false}).limit(300)
+    ]);
     itemRows = items;
+    curOrderCount = curCnt;
+    prevOrderCount = prevCnt;
+    monthActs = (actsRes && actsRes.data) || [];
   }
   catch(error){ el.innerHTML = `<div class="panel">불러오기 실패: ${esc(error.message)}</div>`; return; }
   const byStatus = {}; CUSTS.forEach(c=>byStatus[c.status]=(byStatus[c.status]||0)+1);
@@ -719,19 +746,21 @@ async function renderSummaryView(){
   const rangeOrders = chartRows.reduce((s,r)=>s+(Number(r.order_count)||0),0);
   const byType = summaryByType(summaryRange);
   const topCustomers = summaryTopCustomers(summaryRange, 10);
-  const nowYM = new Date().toISOString().slice(0,7);
-  const dayOfMonth = new Date().getDate();
   const curIdx = (summaryMonths||[]).findIndex(r=>r.month.slice(0,7)===nowYM);
-  const curMonthRow = curIdx>=0 ? summaryMonths[curIdx] : {amount:0, order_count:0};
+  const curMonthRow = curIdx>=0 ? summaryMonths[curIdx] : {amount:0};
   const prevMonthRow = curIdx>0 ? summaryMonths[curIdx-1] : null;
   const momBadge = (cur, prev)=>{
     const c = Number(cur)||0, p = Number(prev)||0;
-    if(!prevMonthRow || !p) return '';
+    if(!p) return '';
     const pct = (c-p)/p*100, up = pct>=0;
     return `<span style="color:${up?'var(--good)':'var(--bad)'}">${up?'▲':'▼'} ${Math.abs(pct).toFixed(1)}%</span>`;
   };
   const amtDelta = momBadge(curMonthRow.amount, prevMonthRow && prevMonthRow.amount);
-  const cntDelta = momBadge(curMonthRow.order_count, prevMonthRow && prevMonthRow.order_count);
+  const cntDelta = momBadge(curOrderCount, prevOrderCount);
+  // 이번달 신규 거래처(첫 주문이 이번달) — customer_stats.first_date 기준, CUSTS는 이미 전량 로드돼 있음
+  const newCustomersThisMonth = CUSTS.filter(c=>c.first_date && c.first_date.slice(0,7)===nowYM).length;
+  const actKindCount = {call:0, visit:0, sms:0};
+  monthActs.forEach(a=>{ if(actKindCount[a.kind]!=null) actKindCount[a.kind]++; });
   el.innerHTML = `
   <div class="kpis">
     <div class="kpi"><div class="l">주문금액 (${rangeLabel(summaryRange)})</div><div class="v">${won(rangeAmount)}</div></div>
@@ -753,10 +782,24 @@ async function renderSummaryView(){
   <div class="panel"><div class="panel-h"><h2>당월 주문 현황</h2><span class="period-tag">${esc(nowYM)} · ${dayOfMonth}일째</span></div>
     <div class="kpis">
       <div class="kpi"><div class="l">당월 주문금액</div><div class="v" title="${won(curMonthRow.amount)}">${eok(curMonthRow.amount)}원</div>${amtDelta?`<div class="s">전월 대비 ${amtDelta}</div>`:''}</div>
-      <div class="kpi"><div class="l">당월 주문수</div><div class="v">${num(curMonthRow.order_count)}건</div>${cntDelta?`<div class="s">전월 대비 ${cntDelta}</div>`:''}</div>
+      <div class="kpi"><div class="l">당월 주문수</div><div class="v">${num(curOrderCount)}건</div>${cntDelta?`<div class="s">전월 대비 ${cntDelta}</div>`:''}</div>
     </div>
     ${Number(curMonthRow.amount)?'':'<p class="small muted" style="margin-top:10px">이번 달 주문 데이터가 아직 없어요.</p>'}
   </div>
+  </div>
+  <div class="panel"><div class="panel-h"><h2>이번달 영업 활동</h2><span class="period-tag">${esc(nowYM)} · ${dayOfMonth}일째</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">신규 거래처</div><div class="v">${num(newCustomersThisMonth)}곳</div><div class="s">이번달 첫 주문</div></div>
+      <div class="kpi"><div class="l">전화</div><div class="v">${num(actKindCount.call)}건</div></div>
+      <div class="kpi"><div class="l">방문</div><div class="v">${num(actKindCount.visit)}건</div></div>
+      <div class="kpi"><div class="l">문자</div><div class="v">${num(actKindCount.sms)}건</div></div>
+    </div>
+    ${monthActs.length ? `
+    <div class="tbl-wrap" style="margin-top:14px"><table><thead><tr><th>거래처</th><th>구분</th><th>내용</th><th class="num">일시</th></tr></thead><tbody>
+      ${monthActs.slice(0,8).map(a=>`<tr class="click" data-goto-cust="${a.customer_id}"><td>${esc((a.customers&&a.customers.name)||'-')}</td><td><span class="tag">${LOG_TYPE[a.kind]||a.kind}</span></td><td class="small muted">${esc((a.note||'').slice(0,40))}${(a.note||'').length>40?'…':''}</td><td class="num small muted">${esc((a.created_at||'').slice(0,10))}</td></tr>`).join('')}
+    </tbody></table></div>
+    ${monthActs.length>8?`<p class="small muted" style="margin-top:6px">이번달 총 ${num(monthActs.length)}건 중 8건만 표시했어요.</p>`:''}
+    ` : `<p class="small muted" style="margin-top:12px">아직 이번달에 기록된 통화·방문·문자가 없어요. 거래처 상세에서 "기록 남기기"로 남기면 여기서 볼 수 있어요.</p>`}
   </div>
   <div class="panel"><div class="panel-h"><h2>${esc(summaryGroupBy)} 누적매출 상위</h2>
     <div class="seg" id="summaryGroupSeg">
@@ -778,6 +821,7 @@ async function renderSummaryView(){
   const gseg = document.getElementById('summaryGroupSeg');
   if(gseg) gseg.onclick = (e)=>{ const b=e.target.closest('button[data-g]'); if(!b) return; summaryGroupBy = b.dataset.g; renderSummaryView(); };
   el.querySelectorAll('[data-hb-id]').forEach(b=> b.onclick = ()=> openDrawer(Number(b.dataset.hbId)) );
+  el.querySelectorAll('[data-goto-cust]').forEach(tr=> tr.onclick = ()=> openDrawer(Number(tr.dataset.gotoCust)) );
 }
 function todayStr(){ return new Date().toISOString().slice(0,10); }
 
