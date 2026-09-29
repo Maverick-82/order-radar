@@ -7,7 +7,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon-192.png" type="image/png">
 <link rel="apple-touch-icon" href="icon-180.png">
-<meta name="theme-color" content="#2a78d6">
+<meta name="theme-color" content="#2563eb">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="주문레이더">
@@ -18,31 +18,34 @@
 <style>
 :root{
   --bg:#f4f6f8; --surface:#ffffff; --surface-2:#eef1f4; --ink:#131820; --ink-2:#434b58; --muted:#737d8b; --line:#e1e5ea; --line-2:#cfd5dd;
-  --accent:#2a78d6; --accent-ink:#1c5cab; --accent-soft:#e2edfa;
+  --accent:#2563eb; --accent-ink:#1a4fc4; --accent-soft:#e8f0fe;
   --good:#1d7f47; --good-soft:#dff1e6; --warn:#a66300; --warn-soft:#fbeed6; --bad:#c23636; --bad-soft:#fbe3e3; --idle:#667085; --idle-soft:#eceef2;
-  --bar:#2a78d6; --bar-muted:#b7d3f6; --shadow:0 8px 30px rgba(20,30,50,.14);
+  --bar:#2563eb; --bar-muted:#b7d3f6; --shadow:0 8px 30px rgba(20,30,50,.14);
   --cat-aqua:#1baf7a; --cat-aqua-soft:#dbf2e9; --cat-orange:#eb6834; --cat-orange-soft:#fbe4d9; --cat-violet:#4a3aa7; --cat-violet-soft:#e7e3f8;
   --cat-yellow:#eda100; --cat-yellow-soft:#fbedd1; --cat-magenta:#e87ba4; --cat-magenta-soft:#fbe4ec; --cat-green:#008300; --cat-green-soft:#dcefdc;
   --card-shadow:0 1px 2px rgba(16,24,40,.04), 0 2px 10px rgba(16,24,40,.06);
+  --card-shadow-hover:0 6px 20px rgba(16,24,40,.10), 0 2px 6px rgba(16,24,40,.06);
   --font:"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
   color-scheme:light;
 }
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
   --bg:#0f1216; --surface:#171b21; --surface-2:#1f242c; --ink:#eef1f5; --ink-2:#c3cad4; --muted:#8e98a5; --line:#2a3039; --line-2:#3a424d;
-  --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#182a41;
+  --accent:#5b93ef; --accent-ink:#93bbf5; --accent-soft:#182a41;
   --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
   --cat-aqua:#199e70; --cat-aqua-soft:#132e26; --cat-orange:#d95926; --cat-orange-soft:#3a2416; --cat-violet:#9085e9; --cat-violet-soft:#241f47;
   --cat-yellow:#c98500; --cat-yellow-soft:#332a10; --cat-magenta:#d55181; --cat-magenta-soft:#3a1f29; --cat-green:#008300; --cat-green-soft:#173517;
   --card-shadow:0 1px 2px rgba(0,0,0,.24), 0 2px 10px rgba(0,0,0,.3);
-  --bar:#3987e5; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; } }
+  --card-shadow-hover:0 6px 22px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
+  --bar:#5b93ef; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; } }
 :root[data-theme="dark"]{
   --bg:#0f1216; --surface:#171b21; --surface-2:#1f242c; --ink:#eef1f5; --ink-2:#c3cad4; --muted:#8e98a5; --line:#2a3039; --line-2:#3a424d;
-  --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#182a41;
+  --accent:#5b93ef; --accent-ink:#93bbf5; --accent-soft:#182a41;
   --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
   --cat-aqua:#199e70; --cat-aqua-soft:#132e26; --cat-orange:#d95926; --cat-orange-soft:#3a2416; --cat-violet:#9085e9; --cat-violet-soft:#241f47;
   --cat-yellow:#c98500; --cat-yellow-soft:#332a10; --cat-magenta:#d55181; --cat-magenta-soft:#3a1f29; --cat-green:#008300; --cat-green-soft:#173517;
   --card-shadow:0 1px 2px rgba(0,0,0,.24), 0 2px 10px rgba(0,0,0,.3);
-  --bar:#3987e5; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; }
+  --card-shadow-hover:0 6px 22px rgba(0,0,0,.4), 0 2px 8px rgba(0,0,0,.3);
+  --bar:#5b93ef; --bar-muted:#1c5cab; --shadow:0 8px 30px rgba(0,0,0,.5); color-scheme:dark; }
 *{box-sizing:border-box}
 body{background:var(--bg);color:var(--ink);font-family:var(--font);font-size:14px;line-height:1.5;margin:0;padding-inline:16px;padding-block:0 48px}
 .wrap{max-width:1280px;margin:0 auto}
@@ -69,21 +72,18 @@ nav.tabs button[data-tab="products"][aria-selected="true"]{color:var(--cat-viole
 button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 section.view{padding-top:18px;display:grid;gap:28px}
 section.view > *{min-width:0}
-h2{font-size:16px;margin:0;font-weight:600}
-h3{font-size:14px;margin:0;font-weight:600}
+h2{font-size:16px;margin:0;font-weight:600;letter-spacing:-.01em}
+h3{font-size:14px;margin:0;font-weight:600;letter-spacing:-.005em}
 .lede{color:var(--ink-2);margin:0;max-width:75ch;line-height:1.6}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;min-width:0;box-shadow:var(--card-shadow)}
 .panel-h{display:flex;flex-wrap:wrap;align-items:baseline;justify-content:space-between;gap:6px 12px;margin-bottom:12px}
 .panel-h .note{color:var(--muted);font-size:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.kpi{background:var(--accent-soft);padding:15px 16px 14px;position:relative}
-.kpi::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:var(--accent)}
-.kpi:nth-of-type(4n+2){background:var(--cat-aqua-soft)}
-.kpi:nth-of-type(4n+2)::before{background:var(--cat-aqua)}
-.kpi:nth-of-type(4n+3){background:var(--cat-orange-soft)}
-.kpi:nth-of-type(4n+3)::before{background:var(--cat-orange)}
-.kpi:nth-of-type(4n+4){background:var(--cat-violet-soft)}
-.kpi:nth-of-type(4n+4)::before{background:var(--cat-violet)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));gap:10px}
+.kpi{background:var(--surface);border:1px solid var(--line);border-left:3px solid var(--accent);border-radius:10px;padding:14px 16px 13px;position:relative;box-shadow:var(--card-shadow);transition:box-shadow .15s ease,transform .15s ease}
+.kpi:hover{box-shadow:var(--card-shadow-hover);transform:translateY(-1px)}
+.kpi:nth-of-type(4n+2){border-left-color:var(--cat-aqua)}
+.kpi:nth-of-type(4n+3){border-left-color:var(--cat-orange)}
+.kpi:nth-of-type(4n+4){border-left-color:var(--cat-violet)}
 .kpi .l{font-size:12px;color:var(--muted);letter-spacing:.02em}
 .kpi .v{font-size:21px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.01em;margin-top:3px}
 .kpi .s{font-size:12px;color:var(--ink-2);margin-top:1px}
@@ -92,10 +92,11 @@ h3{font-size:14px;margin:0;font-weight:600}
 .small{font-size:12px}
 .tbl-wrap{overflow-x:auto;margin-inline:-4px}
 table{border-collapse:collapse;width:100%;font-size:13px}
-th{font-weight:600;color:var(--muted);font-size:12px;text-align:left;padding:8px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap;background:var(--surface);position:sticky;top:0}
-td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap}
+th{font-weight:600;color:var(--muted);font-size:11.5px;letter-spacing:.02em;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap;background:var(--surface);position:sticky;top:0}
+td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;transition:background-color .1s}
+tbody tr:nth-child(even) td{background:var(--surface-2)}
 tr.click{cursor:pointer}
-tr.click:hover td{background:var(--surface-2)}
+tr.click:hover td{background:var(--accent-soft)}
 .lnk{color:var(--accent-ink);cursor:pointer;text-decoration:none;border:0;background:none;font:inherit;padding:0;text-align:left}
 .lnk:hover{text-decoration:underline}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;padding:1px 8px 1px 7px;border-radius:999px;white-space:nowrap;line-height:18px}
@@ -105,6 +106,7 @@ tr.click:hover td{background:var(--surface-2)}
 .s-bad{color:var(--bad);background:var(--bad-soft)}
 .s-info{color:var(--accent-ink);background:var(--accent-soft)}
 .s-idle{color:var(--idle);background:var(--idle-soft)}
+.s-umbrella{color:var(--cat-violet);background:var(--cat-violet-soft)}
 .pill.b-big{color:var(--cat-orange);background:var(--cat-orange-soft)}
 .pill.b-return{color:var(--cat-violet);background:var(--cat-violet-soft)}
 .pill.b-first{color:var(--cat-aqua);background:var(--cat-aqua-soft)}
@@ -126,10 +128,11 @@ tr.click:hover td{background:var(--surface-2)}
 .seg button{font:inherit;font-size:13px;border:0;background:var(--surface);color:var(--ink-2);padding:6px 12px;cursor:pointer;border-right:1px solid var(--line-2)}
 .seg button:last-child{border-right:0}
 .seg button[aria-pressed="true"]{background:var(--accent-soft);color:var(--accent-ink);font-weight:600}
-.btn{font:inherit;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 10px;cursor:pointer}
-.btn:hover{background:var(--surface-2)}
+.btn{font:inherit;font-size:12.5px;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:7px;padding:5px 10px;cursor:pointer;transition:background-color .12s,box-shadow .12s,transform .12s}
+.btn:hover{background:var(--surface-2);box-shadow:var(--card-shadow)}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.btn.primary:hover{background:var(--accent-ink)}
+.btn.primary:hover{background:var(--accent-ink);box-shadow:var(--card-shadow-hover)}
+.btn:active{transform:translateY(1px)}
 .btn:disabled{opacity:.5;cursor:default}
 .btn.icon-btn{padding:5px 9px;font-size:15px;line-height:1;border-radius:999px;color:var(--ink-2)}
 .btn.icon-btn:active{transform:rotate(-40deg);transition:transform .15s}
@@ -375,7 +378,7 @@ function copyTSV(rows, label){
   }
 }
 
-const STATUS_CLS = {'활성':'s-good','신규':'s-info','주의':'s-warn','이탈의심':'s-bad','휴면':'s-idle','일회성':'s-idle'};
+const STATUS_CLS = {'활성':'s-good','신규':'s-info','주의':'s-warn','이탈의심':'s-bad','휴면':'s-idle','일회성':'s-idle','통합집계':'s-umbrella'};
 function statusPill(st){ return `<span class="pill ${STATUS_CLS[st]||'s-idle'}">${esc(st||'-')}</span>`; }
 
 let ME = null; // {id, name, role}
@@ -596,6 +599,7 @@ function statusHelpBlock(){
   <dt>${statusPill('이탈의심')}</dt><dd>주문 3회 이상인데 경과일이 주기×3, 75일을 모두 넘음</dd>
   <dt>${statusPill('휴면')}</dt><dd>주문 2회만 하고 그 뒤 120일 넘게 주문 없음</dd>
   <dt>${statusPill('일회성')}</dt><dd>전체 기간 통틀어 1번만 주문 (최근 90일 이내 신규는 아님)</dd>
+  <dt>${statusPill('통합집계')}</dt><dd>과거 부서 구분 없이 쌓인 '본청' 이름의 옛 거래처예요. 최근 주문은 산하 과·부서 이름으로 개별 등록돼 이 계정 자체는 경과일이 길어 보이지만, 산하 부서들은 최근 60일 내에도 활발히 주문 중이라 이탈로 보지 않아요. 상세에서 산하 부서 목록을 확인하세요.</dd>
   <dt>학교 주의점</dt><dd>학교는 방학(7~8월)·예산 시기 때문에 주문이 끊겨 보일 수 있어요. 이탈의심은 '연락해볼 후보'로 보세요.</dd>
   </dl></details>`;
 }
@@ -606,6 +610,15 @@ function critHelp(summary, dlHtml){
 }
 function gotoCustomersByStatus(status){
   custStatusFilter = status;
+  currentTab = 'customers';
+  document.querySelectorAll('#tabs button[data-tab]').forEach(x=> x.setAttribute('aria-selected', String(x.dataset.tab==='customers')));
+  VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', id!=='customers'));
+  renderTab();
+  window.scrollTo(0,0);
+}
+function gotoCustomersByQuery(name){
+  custQuery = name;
+  custStatusFilter = '전체';
   currentTab = 'customers';
   document.querySelectorAll('#tabs button[data-tab]').forEach(x=> x.setAttribute('aria-selected', String(x.dataset.tab==='customers')));
   VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', id!=='customers'));
@@ -967,7 +980,7 @@ function copyProductLine(text){
 // ---------------- Customers view ----------------
 let custQuery = '';
 let custStatusFilter = '전체';
-const STATUS_ORDER = ['전체','활성','신규','주의','이탈의심','휴면','일회성'];
+const STATUS_ORDER = ['전체','활성','신규','주의','이탈의심','휴면','일회성','통합집계'];
 
 function filteredCustomers(){
   let list = CUSTS;
@@ -1082,7 +1095,7 @@ async function renderItemStop(){
 async function renderReco(){
   const body = document.getElementById('salesBody');
   body.innerHTML = '<div class="panel"><p class="small muted">불러오는 중...</p></div>';
-  const candidates = CUSTS.filter(c=>!['이탈의심','휴면','일회성'].includes(c.status)).sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,150);
+  const candidates = CUSTS.filter(c=>!['이탈의심','휴면','일회성','통합집계'].includes(c.status)).sort((a,b)=>(b.total_amount||0)-(a.total_amount||0)).slice(0,150);
   const ctypes = [...new Set(candidates.map(c=>c.ctype).filter(Boolean))];
   const [{data: pen, error: penErr}, {data: haveRows, error: haveErr}] = await Promise.all([
     sb.from('item_type_penetration').select('*').in('ctype', ctypes).order('penetration_pct', {ascending:false}).limit(3000),
@@ -1558,6 +1571,11 @@ async function openDrawer(custId){
         <div class="kpi"><div class="l">최근주문</div><div class="v">${daysAgoStr(c.days_since_last_order)}</div><div class="s">${c.last_date||''}</div></div>
         <div class="kpi"><div class="l">평소주기</div><div class="v">${c.typical_cycle_days? Math.round(c.typical_cycle_days)+'일':'-'}</div></div>
       </div>
+      ${c.status==='통합집계' ? `<div class="panel" style="background:var(--cat-violet-soft);border-color:var(--cat-violet)">
+        <div class="panel-h"><h3 style="color:var(--cat-violet)">⚠ 통합집계 거래처</h3></div>
+        <p class="small">이 계정은 과거 부서 구분 없이 쌓인 '본청' 이름의 옛 거래처예요. 최근 주문은 산하 과·부서(${c.umbrella_children||0}곳)로 개별 등록되고 있어서, 이 계정 자체는 최근주문이 오래돼 보이지만 이탈은 아니에요.</p>
+        <button class="lnk" id="umbrellaGotoBtn" style="font-weight:600">→ "${esc(c.name)}" 산하 부서 목록 보기</button>
+      </div>` : ''}
       ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
       ${salesDetailHTML(c, itemStats, recoRows, itemStatsSku)}
       <div class="panel">
@@ -1575,6 +1593,8 @@ async function openDrawer(custId){
       <div class="panel" id="logPanel"></div>`;
     body.querySelectorAll('[data-yr]').forEach(b=> b.onclick = ()=>{ custRange = b.dataset.yr; drawBody(); });
     body.querySelectorAll('[data-og]').forEach(el=> el.onclick = ()=> openOrderDetail(orderGroups[Number(el.dataset.og)]) );
+    const umbrellaBtn = document.getElementById('umbrellaGotoBtn');
+    if(umbrellaBtn) umbrellaBtn.onclick = ()=>{ close(); gotoCustomersByQuery(c.name); };
     renderLogSection(custId, acts||[], orderDates);
   }
   drawBody();
