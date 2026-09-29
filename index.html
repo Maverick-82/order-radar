@@ -716,6 +716,8 @@ async function renderSummaryView(){
   const rangeOrders = chartRows.reduce((s,r)=>s+(Number(r.order_count)||0),0);
   const byType = summaryByType(summaryRange);
   const topCustomers = summaryTopCustomers(summaryRange, 10);
+  const nowYM = new Date().toISOString().slice(0,7);
+  const curMonthRow = (summaryMonths||[]).find(r=>r.month.slice(0,7)===nowYM) || {amount:0, order_count:0};
   el.innerHTML = `
   <div class="kpis">
     <div class="kpi"><div class="l">주문금액 (${rangeLabel(summaryRange)})</div><div class="v">${won(rangeAmount)}</div></div>
@@ -729,9 +731,18 @@ async function renderSummaryView(){
     ${chartRows.length? monthBars(chartRows) : '<p class="small muted">데이터가 없습니다.</p>'}
     ${monthTable(chartRows)}
   </div>
+  <div class="grid2">
   <div class="panel"><div class="panel-h"><h2>거래처 상태 분포</h2><span class="period-tag">기준일 ${todayStr()}</span></div>
     <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<button class="chip" data-goto-st="${esc(k)}">${statusPill(k)} ${v}곳</button>`).join('')}</div>
     ${statusHelpBlock()}
+  </div>
+  <div class="panel"><div class="panel-h"><h2>당월 주문 현황</h2><span class="period-tag">${esc(nowYM)} 기준</span></div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">당월 주문금액</div><div class="v">${won(curMonthRow.amount)}</div></div>
+      <div class="kpi"><div class="l">당월 주문수</div><div class="v">${num(curMonthRow.order_count)}건</div></div>
+    </div>
+    ${Number(curMonthRow.amount)?'':'<p class="small muted" style="margin-top:10px">이번 달 주문 데이터가 아직 없어요.</p>'}
+  </div>
   </div>
   <div class="panel"><div class="panel-h"><h2>${esc(summaryGroupBy)} 누적매출 상위</h2>
     <div class="seg" id="summaryGroupSeg">
