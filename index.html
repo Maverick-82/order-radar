@@ -30,7 +30,7 @@
 @media (prefers-color-scheme:dark){ :root:not([data-theme="light"]){
   --bg:#0f1216; --surface:#171b21; --surface-2:#1f242c; --ink:#eef1f5; --ink-2:#c3cad4; --muted:#8e98a5; --line:#2a3039; --line-2:#3a424d;
   --accent:#3987e5; --accent-ink:#86b6ef; --accent-soft:#182a41;
-  --good:#45b877; --good-soft:#15301f; --warn:#ae2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
+  --good:#45b877; --good-soft:#15301f; --warn:#e2a23c; --warn-soft:#342711; --bad:#ee6b6b; --bad-soft:#3a1b1c; --idle:#9aa3b0; --idle-soft:#262b33;
   --cat-aqua:#199e70; --cat-aqua-soft:#132e26; --cat-orange:#d95926; --cat-orange-soft:#3a2416; --cat-violet:#9085e9; --cat-violet-soft:#241f47;
   --cat-yellow:#c98500; --cat-yellow-soft:#332a10; --cat-magenta:#d55181; --cat-magenta-soft:#3a1f29; --cat-green:#008300; --cat-green-soft:#173517;
   --card-shadow:0 1px 2px rgba(0,0,0,.24), 0 2px 10px rgba(0,0,0,.3);
@@ -107,6 +107,7 @@ tr.click:hover td{background:var(--surface-2)}
 .s-idle{color:var(--idle);background:var(--idle-soft)}
 .tag{display:inline-block;font-size:11px;color:var(--ink-2);background:var(--surface-2);border-radius:4px;padding:0 6px;white-space:nowrap;line-height:18px}
 .period-tag{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:3px 10px 3px 9px;white-space:nowrap}
+.count-tag{display:inline-flex;align-items:center;font-size:11.5px;font-weight:600;color:var(--accent-ink);background:var(--accent-soft);border-radius:999px;padding:3px 10px;white-space:nowrap}
 .period-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;flex:none}
 .stackbar{display:flex;gap:2px;height:22px;border-radius:6px;overflow:hidden;background:var(--surface-2)}
 .stackbar .seg{height:100%;min-width:2px}
@@ -728,7 +729,7 @@ async function renderSummaryView(){
     ${chartRows.length? monthBars(chartRows) : '<p class="small muted">데이터가 없습니다.</p>'}
     ${monthTable(chartRows)}
   </div>
-  <div class="panel"><div class="panel-h"><h2>거래처 상태 분포</h2><span class="period-tag">기준일 ${todayStr()}</span><span class="note">클릭하면 목록</span></div>
+  <div class="panel"><div class="panel-h"><h2>거래처 상태 분포</h2><span class="period-tag">기준일 ${todayStr()}</span></div>
     <div class="chip-row">${Object.entries(byStatus).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<button class="chip" data-goto-st="${esc(k)}">${statusPill(k)} ${v}곳</button>`).join('')}</div>
     ${statusHelpBlock()}
   </div>
@@ -737,7 +738,7 @@ async function renderSummaryView(){
       <button data-g="유형별" aria-pressed="${summaryGroupBy==='유형별'}">유형별</button>
       <button data-g="거래처별" aria-pressed="${summaryGroupBy==='거래처별'}">거래처별</button>
     </div></div>
-    <span class="period-tag">${rangeLabel(summaryRange)} 기준</span>${summaryGroupBy==='거래처별'?'<span class="note">클릭하면 거래처 상세로 이동</span>':''}
+    <span class="period-tag">${rangeLabel(summaryRange)} 기준</span>
     ${summaryGroupBy==='유형별'
       ? hbars(Object.entries(byType).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([n,v])=>({n,v,s:won(v)})), {cat:true})
       : hbars(topCustomers)}
@@ -785,7 +786,7 @@ async function renderForecastView(){
       <dt>끊김의심 제외</dt><dd>경과일이 평소주기×3(또는 75일 중 큰 값)을 넘으면 '품목 끊김' 쪽으로 분류돼 이 목록엔 안 나와요</dd>
       <dt>표시 범위</dt><dd>오늘 기준 −21일 ~ 선택한 기간(14/30/60일) 이내로 예상되는 것만</dd>
     `)}
-    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건 예상</div>
+    <div style="margin:10px 0 6px"><span class="count-tag">${num(rows.length)}건 예상</span></div>
     <div class="tbl-wrap"><table><thead><tr><th class="num">예상일</th><th>거래처</th><th>품목</th><th class="num">보통수량</th><th class="num">주기</th><th class="num hide-sm">마지막 주문</th><th>상태</th></tr></thead><tbody>
     ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td class="num">${r.next_date}</td><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${num(r.usual_qty)}</td><td class="num">${r.cycle_days}일</td><td class="num hide-sm">${r.last_date}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
     </tbody></table></div></div>`;
@@ -891,7 +892,7 @@ function renderCustomersView(){
     <div class="panel">
       <div class="panel-h">
         <h2 id="custHeading">거래처</h2>
-        <span class="note">최근 데이터 기준 · 매출 많은 순</span>
+        <span class="period-tag">최근 데이터 기준 · 매출 많은 순</span>
       </div>
       <div class="filters">
         <input type="search" id="cq" placeholder="거래처명, 교육청으로 검색" value="${esc(custQuery)}">
@@ -978,7 +979,7 @@ async function renderItemStop(){
       <dt>${statusPill('끊김의심')}</dt><dd>경과일이 평소주기×3(또는 75일 중 큰 값)을 넘음 — 다른 곳에서 사고 있을 가능성이 큰 단계</dd>
       <dt>정렬</dt><dd>그 품목의 누적 구매금액이 큰 순</dd>
     `)}
-    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}건</div>
+    <div style="margin:10px 0 6px"><span class="count-tag">${num(rows.length)}건</span></div>
     <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th>품목</th><th class="num">이전 주기</th><th class="num">마지막 구매</th><th class="num">누적 금액</th><th>상태</th></tr></thead><tbody>
     ${rows.map(r=>`<tr class="click" data-id="${r.customer_id}"><td>${esc(r.cname)}</td><td class="small">${esc(r.item_name)}</td><td class="num">${r.cycle_days}일 (${r.order_count}회)</td><td class="num">${r.last_date}<div class="small muted">${r.since_days}일 전</div></td><td class="num">${won(r.total_amount)}</td><td><span class="pill ${PST[r.status]||'s-idle'}">${esc(r.status)}</span></td></tr>`).join('')}
     </tbody></table></div></div>`;
@@ -1014,7 +1015,7 @@ async function renderReco(){
       <dt>표본 기준</dt><dd>같은 기관유형이 8곳 이상이고, 그 품목을 산 곳이 3곳 이상일 때만 계산 — 표본이 적으면 통계가 부정확해서 제외</dd>
       <dt>정렬</dt><dd>거래처는 누적매출 큰 순, 추천 품목은 그 안에서 구매율 높은 순 최대 3개</dd>
     `)}
-    <div class="small muted" style="margin:10px 0 6px">${num(rows.length)}곳</div>
+    <div style="margin:10px 0 6px"><span class="count-tag">${num(rows.length)}곳</span></div>
     <div class="tbl-wrap"><table><thead><tr><th>거래처</th><th class="num">누적 금액</th><th>추천 1순위</th><th>추천 2순위</th><th class="hide-sm">추천 3순위</th></tr></thead><tbody>
     ${rows.map(r=>{ const cell = x => x?`<b>${esc(x.item_name)}</b><div class="small muted">동종 ${x.penetration_pct}%</div>`:''; return `<tr class="click" data-id="${r.c.customer_id}"><td>${esc(r.c.name)} <span class="tag">${esc(r.c.ctype||'')}</span></td><td class="num">${won(r.c.total_amount)}</td><td>${cell(r.opts[0])}</td><td>${cell(r.opts[1])}</td><td class="hide-sm">${cell(r.opts[2])}</td></tr>`; }).join('')}
     </tbody></table></div></div>`;
@@ -1105,7 +1106,7 @@ function renderPriority(){
       <dt>연락 타이밍</dt><dd>지금이 그 기관유형의 '연락 좋은 시점'이면 ×1.2 가점 — 학교는 3월·9월, 공공기관은 3~4월·9~12월</dd>
       <dt>최종 순위</dt><dd>위 네 가지를 모두 곱한 점수가 높은 순으로 최대 40곳</dd>
     `)}
-    <div class="small muted" style="margin:10px 0 6px">상위 ${list.length}곳</div>
+    <div style="margin:10px 0 6px"><span class="count-tag">상위 ${list.length}곳</span></div>
     <div class="tbl-wrap"><table>
       <thead><tr><th class="num">순위</th><th>거래처</th><th>상태</th><th>타이밍</th><th class="num">누적매출</th><th class="num">최근주문</th></tr></thead>
       <tbody>${list.map((c,ri)=>`<tr class="click" data-id="${c.customer_id}">
@@ -1467,7 +1468,7 @@ async function openDrawer(custId){
       ${['이탈의심','주의','휴면','일회성'].includes(c.status) ? salesTipHTML(c) : ''}
       ${salesDetailHTML(c, itemStats, recoRows, itemStatsSku)}
       <div class="panel">
-        <div class="panel-h"><h3>월별 주문금액</h3><span class="note">${chartRows.length}개월</span></div>
+        <div class="panel-h"><h3>월별 주문금액</h3><span class="period-tag">${chartRows.length}개월</span></div>
         ${hasAnyOrders ? monthRangeChips(custMonthsAll, custRange, 'custChartSeg') : ''}
         ${hasAnyOrders ? monthBars(chartRows) : '<p class="small muted">주문 이력이 없습니다.</p>'}
       </div>
@@ -1490,7 +1491,7 @@ function renderLogSection(custId, acts, orderDates){
   const panel = document.getElementById('logPanel');
   if(!panel) return;
   panel.innerHTML = `
-    <div class="panel-h"><h3>통화·방문·문자 기록</h3><span class="note">${acts.length}건</span></div>
+    <div class="panel-h"><h3>통화·방문·문자 기록</h3><span class="period-tag">${acts.length}건</span></div>
     <div id="logList">${acts.map(a=>logItemHTML(a, orderDates)).join('') || '<p class="small muted">아직 기록이 없습니다.</p>'}</div>
     <div class="log-form" style="margin-top:12px">
       <div class="row">
