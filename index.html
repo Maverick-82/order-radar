@@ -76,6 +76,7 @@ nav.tabs button[aria-selected="true"]{color:var(--accent-ink);background:var(--a
 nav.tabs button[data-tab="customers"][aria-selected="true"]{color:var(--cat-aqua);background:var(--cat-aqua-soft)}
 nav.tabs button[data-tab="sales"][aria-selected="true"]{color:var(--cat-orange);background:var(--cat-orange-soft)}
 nav.tabs button[data-tab="products"][aria-selected="true"]{color:var(--cat-violet);background:var(--cat-violet-soft)}
+nav.tabs button[data-tab="cityhall"][aria-selected="true"]{color:var(--cat-magenta);background:var(--cat-magenta-soft)}
 button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 section.view{padding-top:18px;display:grid;gap:28px}
 section.view > *{min-width:0}
@@ -327,7 +328,7 @@ dl.defs dd{margin:0;color:var(--ink-2)}
     <div class="titlegrp">
       <img class="logo" src="data:image/png;base64,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" alt="AbleMarket">
       <span class="divider" aria-hidden="true"></span>
-      <h1>거래처 주문 레이더 <span class="ver-tag">v1.4</span></h1>
+      <h1>거래처 주문 레이더 <span class="ver-tag">v1.5</span></h1>
     </div>
     <div class="whoami">
       <div class="row"><button class="btn icon-btn" id="btn-theme" title="테마: 자동" aria-label="테마 전환">🌓</button><button class="btn icon-btn" id="btn-refresh" title="새로고침" aria-label="새로고침">↻</button><span id="who-name"></span><span class="role" id="who-role"></span><button class="btn" id="btn-logout">로그아웃</button></div>
@@ -339,6 +340,7 @@ dl.defs dd{margin:0;color:var(--ink-2)}
     <button data-tab="customers" aria-selected="false">🏢 거래처</button>
     <button data-tab="sales" aria-selected="false">💼 영업</button>
     <button data-tab="products" aria-selected="false">🏷️ 제품가격</button>
+    <button data-tab="cityhall" aria-selected="false">🏛️ 시청</button>
   </nav>
 </header>
 
@@ -346,6 +348,7 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 <section class="view hide" id="view-customers"></section>
 <section class="view hide" id="view-sales"></section>
 <section class="view hide" id="view-products"></section>
+<section class="view hide" id="view-cityhall"></section>
 </div>
 
 <div id="drawerHost"></div>
@@ -375,6 +378,12 @@ function parseContact(raw){
   name = name.replace(/[\/,·]/g,' ').replace(/\s+/g,' ').trim();
   return {name, phones, raw:s};
 }
+function contactCell(raw){
+  const c = parseContact(raw);
+  if(!c) return '<span class="small muted">-</span>';
+  const phones = c.phones.length ? `<div class="small muted">${c.phones.map(p=>`<a href="tel:${p.replace(/[^0-9]/g,'')}">${esc(p)}</a>`).join(' · ')}</div>` : '';
+  return `<div class="small">${esc(c.name||'-')||'<span class=\"muted\">-</span>'}</div>${phones}`;
+}
 function toast(msg){
   const t = document.getElementById('toast'); if(!t) return;
   t.textContent = msg; t.hidden = false;
@@ -399,7 +408,7 @@ let CUSTS = []; // customer_stats rows, loaded once per session
 let custById = new Map();
 let currentTab = 'summary';
 let currentSalesSub = 'priority';
-const VIEW_IDS = ['summary','customers','sales','products'];
+const VIEW_IDS = ['summary','customers','sales','products','cityhall'];
 
 // ---------------- Auth ----------------
 const authBoxes = ['loginBox','signupBox','forgotBox','resetBox'];
@@ -537,6 +546,7 @@ function renderTab(){
   else if(currentTab==='customers') renderCustomersView();
   else if(currentTab==='sales') renderSalesView();
   else if(currentTab==='products') renderProductsView();
+  else if(currentTab==='cityhall') renderCityHallView();
 }
 
 // ---------------- Data load ----------------
@@ -1019,6 +1029,142 @@ function copyProductLine(text){
     ta.remove();
   };
   try{ navigator.clipboard.writeText(text).then(done, fallback); }catch(e){ fallback(); }
+}
+
+// ---------------- City Hall (시청) view ----------------
+// city_hall_department_stats는 뷰라서, 부서 목록(city_hall_departments, 현장조사 결과 포함)에
+// orders를 매 조회 때마다 실시간으로 조인해요 — 그래서 새 주문이 들어오면 "최근 주문일" 등이
+// 스냅샷을 다시 만들 필요 없이 자동으로 최신 상태를 반영해요.
+let CITYHALL = [];
+let chQuery = '';
+let chBuilding = '전체';
+let chStatus = '전체';
+const CH_BUILDING_ORDER = ['본청','서소문청사','서소문2청사','무교로청사','남산청사','프레스센터'];
+const CH_STATUS_ORDER = ['전체','확보(주문이력 있음)','영업기회(생산시설 직접거래-우회구매)','영업기회(우선구매 미참여 추정)','영업기회(경쟁사 공급중-미분류)','확인필요(우리 공급 가능성-경쟁사 아닐 수 있음)','거래처(복사용지 주문없음)','조사됨(현장정보 있음)','미확인'];
+const CH_STATUS_SHORT = {
+  '확보(주문이력 있음)':'확보',
+  '영업기회(생산시설 직접거래-우회구매)':'영업기회(우회구매)',
+  '영업기회(우선구매 미참여 추정)':'영업기회(미참여)',
+  '영업기회(경쟁사 공급중-미분류)':'영업기회(미분류)',
+  '확인필요(우리 공급 가능성-경쟁사 아닐 수 있음)':'확인필요(경쟁사 아닐수도)',
+  '거래처(복사용지 주문없음)':'거래처(주문없음)',
+  '조사됨(현장정보 있음)':'조사됨',
+  '미확인':'미확인',
+};
+const CH_STATUS_CLS = {
+  '확보(주문이력 있음)':'s-good',
+  '거래처(복사용지 주문없음)':'s-info',
+  '영업기회(생산시설 직접거래-우회구매)':'s-bad',
+  '영업기회(우선구매 미참여 추정)':'s-warn',
+  '영업기회(경쟁사 공급중-미분류)':'s-bad',
+  '확인필요(우리 공급 가능성-경쟁사 아닐 수 있음)':'s-idle',
+  '조사됨(현장정보 있음)':'s-idle',
+  '미확인':'s-idle',
+};
+function chStatusPill(st){ return `<span class="pill ${CH_STATUS_CLS[st]||'s-idle'}">${esc(CH_STATUS_SHORT[st]||st||'-')}</span>`; }
+
+async function ensureCityHallLoaded(){
+  if(CITYHALL.length) return CITYHALL;
+  const {data, error} = await sb.from('city_hall_department_stats').select('*');
+  if(error){ throw error; }
+  const floorKey = f=>{
+    if(!f) return 0;
+    const s = String(f).replace('층','');
+    if(s.startsWith('지하')){ const n = parseInt(s.replace('지하',''),10); return Number.isFinite(n) ? -n : -99; }
+    const n = parseInt(s,10); return Number.isFinite(n) ? n : 0;
+  };
+  CITYHALL = (data||[]).slice().sort((a,b)=>{
+    const bi = CH_BUILDING_ORDER.indexOf(a.building) - CH_BUILDING_ORDER.indexOf(b.building);
+    if(bi) return bi;
+    const di = (a.dong||'').localeCompare(b.dong||'');
+    if(di) return di;
+    return floorKey(b.floor) - floorKey(a.floor);
+  });
+  return CITYHALL;
+}
+
+function filteredCityHall(){
+  let list = CITYHALL;
+  if(chBuilding!=='전체') list = list.filter(r=>r.building===chBuilding);
+  if(chStatus!=='전체') list = list.filter(r=>r.status===chStatus);
+  const q = chQuery.trim().toLowerCase();
+  if(q) list = list.filter(r=> (r.dept_name||'').toLowerCase().includes(q) || (r.customer_name||'').toLowerCase().includes(q) || (r.building||'').toLowerCase().includes(q));
+  return list;
+}
+
+async function renderCityHallView(){
+  const el = document.getElementById('view-cityhall');
+  el.innerHTML = '<div class="spin">불러오는 중...</div>';
+  try{ await ensureCityHallLoaded(); }
+  catch(e){ el.innerHTML = `<div class="panel err">불러오기 실패: ${esc(e.message||e)}</div>`; return; }
+
+  const total = CITYHALL.length;
+  const cnt = st => CITYHALL.filter(r=>r.status===st).length;
+  const bypassN = cnt('영업기회(생산시설 직접거래-우회구매)');
+  const commercialN = cnt('영업기회(우선구매 미참여 추정)');
+  const secureN = cnt('확보(주문이력 있음)');
+  const unknownN = cnt('미확인');
+
+  el.innerHTML = `
+    <div class="panel">
+      <div class="panel-h">
+        <h2>서울시청 복사용지 영업현황</h2>
+        <span class="note">공식 청사안내(seoul.go.kr) 기준 ${num(total)}개 부서 · 현장조사 2026.7~8</span>
+      </div>
+      <div class="kpis">
+        <div class="kpi"><div class="l">확보</div><div class="v">${num(secureN)}</div><div class="s">주문이력 있음</div></div>
+        <div class="kpi"><div class="l">영업기회 · 우회구매</div><div class="v">${num(bypassN)}</div><div class="s">생산시설 직접거래 확인됨</div></div>
+        <div class="kpi"><div class="l">영업기회 · 미참여</div><div class="v">${num(commercialN)}</div><div class="s">일반업체 사용 추정</div></div>
+        <div class="kpi"><div class="l">미확인</div><div class="v">${num(unknownN)}</div><div class="s">향후 조사 대상</div></div>
+      </div>
+      <p class="explain">우회구매는 현장조사에서 확인된 공급업체가 우리와 거래하는 생산시설(치즈·갑을·꿈드래·그린내·나눔·SD·리드릭 등)인데, 그 부서·품목은 우리를 거치지 않고 생산시설에 직접 주문 중인 것으로 확인된 곳이에요 — 전환 가능성이 가장 높은 타깃입니다. 미참여는 더블A·후지필름 등 일반 상업 브랜드를 쓰고 있어 우선구매 제도 안내부터 필요한 곳이에요.</p>
+      <div class="filters" style="margin-top:12px">
+        <input type="search" id="chq" placeholder="부서명, 거래처명, 건물로 검색" value="${esc(chQuery)}">
+        <select id="chBuildingSel">
+          <option ${chBuilding==='전체'?'selected':''}>전체</option>
+          ${CH_BUILDING_ORDER.filter(b=>CITYHALL.some(r=>r.building===b)).map(b=>`<option ${chBuilding===b?'selected':''}>${esc(b)}</option>`).join('')}
+        </select>
+        <select id="chStatusSel">
+          ${CH_STATUS_ORDER.map(s=>`<option value="${esc(s)}" ${chStatus===s?'selected':''}>${s==='전체'?'전체 상태':(CH_STATUS_SHORT[s]||s)}</option>`).join('')}
+        </select>
+        <button class="btn" id="chcopyall">목록 복사</button>
+      </div>
+      <div id="chResult" style="margin-top:12px"></div>
+    </div>`;
+
+  function draw(){
+    const list = filteredCityHall();
+    document.getElementById('chResult').innerHTML = `
+      <div class="small muted" style="margin-bottom:6px">${num(list.length)}개 부서</div>
+      <div class="tbl-wrap"><table><thead><tr>
+        <th>건물</th><th>부서명</th><th>상태</th><th>거래처</th>
+        <th>복사용지 최근주문</th><th>우리 최근품목·생산시설(전품목)</th><th>현장 확인 공급업체</th><th>담당자</th>
+      </tr></thead><tbody>
+      ${list.slice(0,400).map(r=>`<tr>
+        <td class="small">${esc(r.building)}${r.dong?' '+esc(r.dong):''}<div class="small muted">${esc(r.floor||'')}</div></td>
+        <td>${esc(r.dept_name)}${r.unit_type?` <span class="tag">${esc(r.unit_type)}</span>`:''}</td>
+        <td>${chStatusPill(r.status)}</td>
+        <td class="small">${r.customer_id?`<button class="lnk" data-cust="${r.customer_id}">${esc(r.customer_name||'')}</button>`:(r.customer_name?esc(r.customer_name):'<span class="muted">-</span>')}</td>
+        <td class="small">${r.copier_last_date?`${esc(r.copier_last_date)}<div class="small muted">${num(r.copier_order_count)}회 · ${esc(r.copier_last_item||'')}</div>`:'<span class="muted">-</span>'}</td>
+        <td class="small">${r.last_item_name?`${esc(r.last_item_name)}<div class="small muted">${esc(r.last_supplier_name||'')} · ${esc(r.last_order_date||'')}</div>`:'<span class="muted">-</span>'}</td>
+        <td class="small">${r.competitor_raw?`${esc(r.competitor_raw)}${r.competitor_item?` (${esc(r.competitor_item)})`:''}<div class="small muted">${esc(r.survey_date||'')}</div>`:(r.survey_result?`<span class="small muted">${esc(r.survey_result)}</span>`:'<span class="muted">-</span>')}</td>
+        <td>${contactCell(r.investigator)}</td>
+      </tr>`).join('')}
+      </tbody></table></div>
+      ${list.length>400?`<div class="small muted" style="margin-top:8px">검색 결과 ${num(list.length)}건 중 400건만 표시 — 검색어를 더 입력해보세요.</div>`:''}`;
+    document.getElementById('chResult').querySelectorAll('[data-cust]').forEach(btn=>{
+      btn.onclick = ()=> openDrawer(Number(btn.dataset.cust));
+    });
+  }
+  document.getElementById('chq').oninput = (e)=>{ chQuery = e.target.value; draw(); };
+  document.getElementById('chBuildingSel').onchange = (e)=>{ chBuilding = e.target.value; draw(); };
+  document.getElementById('chStatusSel').onchange = (e)=>{ chStatus = e.target.value; draw(); };
+  document.getElementById('chcopyall').onclick = ()=>{
+    const rows = [['건물','동','층','부서명','상태','거래처','복사용지최근주문일','복사용지주문횟수','복사용지최근품목','우리최근품목','우리최근생산시설','우리최근주문일','현장확인공급업체','현장확인품목','조사일자','담당자']]
+      .concat(filteredCityHall().map(r=>[r.building,r.dong||'',r.floor,r.dept_name,r.status,r.customer_name||'',r.copier_last_date||'',r.copier_order_count||'',r.copier_last_item||'',r.last_item_name||'',r.last_supplier_name||'',r.last_order_date||'',r.competitor_raw||'',r.competitor_item||'',r.survey_date||'',r.investigator||'']));
+    copyTSV(rows, '시청 부서 목록');
+  };
+  draw();
 }
 
 // ---------------- Customers view ----------------
