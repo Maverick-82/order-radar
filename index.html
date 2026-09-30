@@ -101,6 +101,10 @@ h3{font-size:14px;margin:0;font-weight:600;letter-spacing:-.005em}
 .muted{color:var(--muted)}
 .small{font-size:12px}
 .tbl-wrap{overflow-x:auto;margin-inline:-4px}
+.hscroll-fixed{position:fixed;left:0;right:0;bottom:env(safe-area-inset-bottom,0px);height:14px;overflow-x:auto;overflow-y:hidden;background:var(--surface);border-top:1px solid var(--line);z-index:35}
+.hscroll-fixed.hide{display:none}
+.hscroll-fixed>div{height:1px}
+.kpi.click{cursor:pointer}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th{font-weight:600;color:var(--muted);font-size:11.5px;letter-spacing:.02em;text-align:left;padding:9px 10px;border-bottom:1px solid var(--line-2);white-space:nowrap;background:var(--surface);position:sticky;top:0}
 td{padding:9px 10px;border-bottom:1px solid var(--line);vertical-align:top;white-space:nowrap;transition:background-color .1s}
@@ -328,7 +332,7 @@ dl.defs dd{margin:0;color:var(--ink-2)}
     <div class="titlegrp">
       <img class="logo" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAIkAAABACAYAAAAuw1S1AAAOZklEQVR4nO2ce5zU1XXAv+f+Zl+z7EMIMLvgg4AKiAhBMSgamsbWFyjiLsguIDQ11tpqm6YmUePqp0Y00cakNZKHymN5jAREC5IoaLVoY2M0NiiKBiywsyAuj33P43fyx+zsznt22Vl3Q3/fz2f/mHvPPffM73fmPs65d8HBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHBwcHB4eRB+tuAjLykLvYdHItlnwUyHLAIqR+MDzHvsWDoRyDaL7Y9dXA0LntZXOmvqC57qMe6Vu4/D7EejivdQHXZYydsX5Zw9bcBKVm+fwguq5I6319gpAiN8mcjgAIhqK3/BOq2kOPaSOWwpv4y92TG9LcBCagKK+vm4LJWoMxBpSi9PENRWUQguJwVvi99Rlb+v2JgOckyzWF1/XcQ+RuUvB61VSnBcDcr6m5CdeBPo39CDBwnqVFDoe87KJf0So+RSlbX39wLO1x4Dw2iRgfOs+lnBs6aZHT9IpBpWdGlzGFV/QdUe7Z1S35F3flYcjUwAa0vxQ+M8QWp9e3G1m0MaX6eK89s75ENW3bn0VA0HbEvBCkDLOAgar/Oh+XbqZFgT79WJzXqYnT9dOB8BA+qRRgJoboPo7/BdeQ/qZzgP2H9cQyMYbm2/vNgP45K9n69qo3k5d9I5eBjKWW8+wbjd90BTEmvi08gtJQFI38XU55qd2PMVmz728DnkuoTDmCF7mfeyA86y7q7u1lZdwlGbkEZmsbiT7HlERZ6fp32e3WTATKk6o1ZdRAAkSLaWytS1i/fPwS/9QMyOQiAMBQxD7Km7vyMssqpqP0AqRwkLDOCkPV9avedmVFfNKvqlyByTwYHARiC0ftZVX91j/SnoP+dxOsbimp2ppl4RK6kRhOn1Bo1uKwakPLk7TRJ3EVc2NzJk3tK0/fJuG4tuhU3uO5Kal8yVtddCzo/iZ520IOgidOX2Lexon5Ct/Snof+dJGBfBNJH054UM6ru3ITizx+cgTIuoVz1OWyZT1X5Zdjy16BvxNZLETn5Vd3vngaQ1aD/DuxI7I8RjKn7ckY9K+qHYctNcY2PoXovH3lmUl1eRW7DLODxGAdXEcS+HXq32+t/J1FJfFnZxCXjE8ose26iHdSyoPxRFnoOAbDQs4cPy+4i/uUKf8kyzcnYr/IeOdYSqj1PUF2+keqyexC9L3GUMtdk1GW0AsjtskGVkP0tFpS/So3YAFRO8FNdth7lF7H2yhnUHjgvYx/puu9N46wgMqJP9at4Yj7/bN9gVEbHynCAPM+KhLY1YiP+H4AGomTdFB1K79hCOwHuS4gAV5W/kvAS4WxW1Bdm+BIXx36U37IoatEbTa7E6wdMr4KM/b8FtjW3z2YbACE2Yuu2xmPHyRh9kUoJJW1fdfoRan2/RpneWRbSM4B3UvZp8xJLyj5JWtcW8pJvzYmdYu3TUupa+UkZBIfFlKnmsLpuTlL5oIJIS3jNE5FPMrX2gP53kr4nbrQ0p4TzPtFF+lFaDbbuRqTLSYymX5gaeTtl3VdPbaDWV4fSNYLmmGKCdltSeQ0NSQhUiEzEZmJaG2J0yKndlk3CZ+okzZsot4QJIgxVoRBg2vbynbuO8153ddhA+6ApBXhmDsMzdwyu0oKeWWHnJoaHJEPgSQIxH23S9xmyj6bXp59C1DQb0HyE5E5iQiW9XhVID1MccfS5k+gLlLS3cSNCBcqZ0PE77vgxv/5nJ6L1TeBNbK0J/fIQb8z+4PK3mPiz6WB1Y97S4wlOEpBhyWU7MOqJ2yBYaeVdpji9CVISq5+W+MGtE9s6homrFA4AH6ftI4v0mZOoIoHNLGxv406gJOVD6AVGsK4YzrS24VunvXNs5K6phx57l2Gz0weo/KYu4VtbejGwJXkDFdR3YUyRZBhJ1J4AbE9a520oIdB2WozTqX0cyE8qnx84gj/OYNHfMb/8kbQ2ZJE+2d3oS+S3b+antvIQUJKxQRaYWMLYpjG3zOK1qVvTCu71vB8OQEWhTOUp3zlJ5VcdvKrjsFMXkmkLLF9hWUPy7x1ovwaNWrSKKiWyL6WqylMPAIdjykIkbutjbN4/kpX7z+v8W+M7I7296cm6k+gycvxNrESZmW3dmXAJrrYr9n2DbWXPphQKJ9ZeiS0UwaX3sbpubEzxat+XwL41QYdK+jlecVPYdgfe3+fGlC8/MBnVG+Kk/5dZ5S1p9SFxsRo5gzUHLkoquqyhBLW+h1gPd/6FyJxOSEPWp5v2EXwX5dJs6+0JrdfxrYK3H61l1G2TkgoYXQv8eWy+SEqw9UfU+t7GVh9GxmBzVvIcqKY/CBXWN5XAkMdZWfcsKkcQnYThqoQclc3GjKps1mH0apCutZBt7mSV70kCbS+yeNRRtuzO43DhBVhtN6MSndtphtxfZbY3NVkdSVo3cynKwmzqPBEEzB/GLr2M4PHkO4aq8o9REoNniKBMRuRKlLPSdOBJWReNchoit2K4G5GZCQ6ifMCCsv/KqGeh5xASZ284P3QzOfnrWeXbQsOgzRipSQgeok9RPeR4t+xNQdacRBURm3uypa+3lOfjGfPm2a+mFKgqq8VW7wmqPx3voUHJq+LyPSnRY+QF7+/2Ie75ZatBNqWozU1R/jxVZc90z57UZM1JAs9xIdDrjGM2eeFS5hPyJ38JIsrC8p8gegfwbkolwlGU12LKVAztwelJ5Q1vovaDQHNqnfp7rJy/61iUdg8RpdrzI2z5LkLyaG6Xgccw8ijVZQ8jvb9JkLU1iRqu7ottbm8oy8fDuw/UpRWqKg8HXbyHPARDZ6N2KSGrANFGhD3s9uziC758juvkuJaHMVoPduzoKbl7WDC0jmV1O3DLVETOBT0FxYVQj2W/zg0j3kqwI8+9F39rrC7bSrR9oWc7L+kr7PNNwpiJYA8HCkH82FqP0Z00l7/B1+ICgL0ga0mTtud4EUhMy/czS/6Hpavv41/7244/ZbK3uxHGDLSRBOAyD6NW97cRKWhaz0QJ8VUAUV52z2NDb3W2ehllK48AqOGNQRU80Fud2XMSzRCF7CeG5pM+RN6PiDICYS6ACseh904StCk0hosAxKZXu5oIJ30W2G0REx3VZeQ0lXA2gMnhU/d11LeuZ5oq4wQa2mD74EqOATR7mYJynhHaNMSr7huIiYxqDaZpPDOM8kWEPBX2Bv08U1rFkYhM4waG4WcYwKBWPuRj/E3jmSHC6dgcTjbhqxerye5K7wfz2H/KbI4e2UhpboAbUCYDecBuS1mTP4+PIvaqTVdAUBjcsoaLgjk0FF/PrhN9hllzEoFDCukTZf1AgcROgq3FeIxhG4CEWN76NCMUvgLhnGO+crRxLdeKcDMwDwlnnrGwm73cVVjJzwGavHha4AkDUyIvWhRycrir+Wn+sbCCTQASZJEY/gmgzU2FPZ47DUxCQeCWZDN0s/J9Y4icZ91RGqCqZT0XEuAphcFRjnV5SPhay1puc89jA8pPxDAyStVUtdhohdgKLDrRZ5i9YJqk2Ub2IyV5qVdKCvMjDtJZJpRahmdFmBcnboB7m7x4dAt5BtYQOWmvqNA5tA9Cebx5LRck6a8GmJTO3qan+WeRTgd5yw1VLRal2KxUGAwEgC0Im4BWIFcNP2xcyziB94GuszFKoyg7gf9L12cmshdMg5ezpSubeNI4CZAD1LihXJTr6Bg0FIpRnnfnMyoU5BwgclQwR5QvNjdRqXQm2fZaysXuSs5EWUz4JRo1fCO+MxXOEWUXwr0qfFOFmG1q0zoWifL1jo9vt/mplEpaJcTfa0eiVGFxYSWLCyu4SUKdzpRjhNvcc5lv20QfmN7hnsuXC+dydw8eWQJZc5JgiA1A1vbm2aLQSuMkyu7CSn4slYTcc9lB9BkN5Ycyi5bi+RwWovIrwjDoSl5KiH+IrAkK57IFwtORwCXqTVjM7y0o4IrCCh4bVMGTRDmJKJeIsDRiV8jF/CHV4dFJlSs6xA6qja9xLRMa1zIhFF7sHuyoixkRs0nWnGTQNRxEeDpb+j4LRBIO7nTe9gvZXUO0QsyBZoHImZXWgvf575g6JZJMM62h2AtaonhlFkkzviqMJfI+hMKiYPg4g3rJRSjrEBtuDNui/4DhHW2KGjf0zZowq7sbv839uYYrUUqzqbevUCX2QpPSElkUBl1pR0ULQCAgNXHHqqNGh1AOxWLH1HX3NFl5C3wTuItmDJGz9Eq7wIepGkkw4QxbVsiqkxTP4nDbZm4FVqAD4LpG31EHDFcoblzPOUXXszOqrus2YhCJfgoqafI5is8YbreVVYTXSkua1uOV63mnxUtDx66m0V1J2stcjWvTXC89QbL+IvOv4gVRbkcSLi6cNEQv0o3Ng7opfG2jcS0TgM5DSpbVg0Ce8B8FFbwM/DjSXGy+pzUYVSL/HeFzrV4679Col4JmL1tbvOxuXsf6BJW9PAAdoU9+7XkzWadKNXQFlU4m1MUT0rV+uaC1jd80e3neCL9UuhxDyXixOwE3PAqdWd5JLeNZHLL4Nzo2BTasal7HT1vWsbQFXgMmd/S5CiDH1XU0U+HS5nUsb/GSeLquB/TZlFAwk23+8IWmVQzAXU9vKLqOQyL8FR0LWhVKgS8gsdO3KKOTNE+LVNIkwr9EFX3b+DmC8LeAH8hFmKXCYiB84V35eeFcngHIs/kDEDmCYCFcrpoYs+kJfRqWL57FYeDrTZt4yGWYLTADYbwqwzM27iNCebSbQPh8iJq4ULWwM7JhPqU9alGr+KDzTIkPoKCCVxs3MM0KUAVMsYVcI+xX5WW0YzsqhIxQp3a4rRgaYroTGiJ1CHsi5QU78baMYwYdOxcxXFtYwbKWNfzWtqgycK5CvsBelA0d2/ewmkpCrb9gtga5BeF0VfJESTya4ODg4ODg4ODg4ODg4ODg4ODg4ODg4OAwEPkjAM/rqjCoYzwAAAAASUVORK5CYII=" alt="AbleMarket">
       <span class="divider" aria-hidden="true"></span>
-      <h1>거래처 주문 레이더 <span class="ver-tag">v1.5</span></h1>
+      <h1>거래처 주문 레이더 <span class="ver-tag">v1.6</span></h1>
     </div>
     <div class="whoami">
       <div class="row"><button class="btn icon-btn" id="btn-theme" title="테마: 자동" aria-label="테마 전환">🌓</button><button class="btn icon-btn" id="btn-refresh" title="새로고침" aria-label="새로고침">↻</button><span id="who-name"></span><span class="role" id="who-role"></span><button class="btn" id="btn-logout">로그아웃</button></div>
@@ -353,6 +357,7 @@ dl.defs dd{margin:0;color:var(--ink-2)}
 
 <div id="drawerHost"></div>
 <div id="toast" class="toast" hidden></div>
+<div id="hscrollBar" class="hscroll-fixed hide"><div id="hscrollBarInner"></div></div>
 
 <script>
 const SUPABASE_URL = "https://hevlgbkkzrambtkqfbka.supabase.co";
@@ -384,6 +389,32 @@ function contactCell(raw){
   const phones = c.phones.length ? `<div class="small muted">${c.phones.map(p=>`<a href="tel:${p.replace(/[^0-9]/g,'')}">${esc(p)}</a>`).join(' · ')}</div>` : '';
   return `<div class="small">${esc(c.name||'-')||'<span class=\"muted\">-</span>'}</div>${phones}`;
 }
+// 가로로 넓은 표(시청 탭 등)는 표 자체의 가로 스크롤바가 화면 맨 아래(표 끝)에 있어서
+// 스크롤을 한참 내려야만 보여요 — 그래서 화면 하단에 고정된 별도 스크롤바를 만들어서
+// 표의 스크롤과 서로 동기화시켜요. 화면 어디서든 바로 가로로 이동할 수 있게.
+let hscrollWrap = null;
+function syncHScrollBar(){
+  const bar = document.getElementById('hscrollBar');
+  const inner = document.getElementById('hscrollBarInner');
+  if(!hscrollWrap || !hscrollWrap.isConnected){ bar.classList.add('hide'); return; }
+  const need = hscrollWrap.scrollWidth > hscrollWrap.clientWidth + 2;
+  bar.classList.toggle('hide', !need);
+  inner.style.width = hscrollWrap.scrollWidth + 'px';
+  bar.scrollLeft = hscrollWrap.scrollLeft;
+}
+function bindStickyHScroll(wrapEl){
+  hscrollWrap = wrapEl;
+  const bar = document.getElementById('hscrollBar');
+  let syncing = false;
+  wrapEl.onscroll = ()=>{ if(syncing) return; syncing=true; bar.scrollLeft = wrapEl.scrollLeft; syncing=false; };
+  bar.onscroll = ()=>{ if(syncing) return; syncing=true; wrapEl.scrollLeft = bar.scrollLeft; syncing=false; };
+  syncHScrollBar();
+}
+function unbindStickyHScroll(){
+  hscrollWrap = null;
+  document.getElementById('hscrollBar').classList.add('hide');
+}
+window.addEventListener('resize', ()=>{ if(hscrollWrap) syncHScrollBar(); });
 function toast(msg){
   const t = document.getElementById('toast'); if(!t) return;
   t.textContent = msg; t.hidden = false;
@@ -536,6 +567,7 @@ async function boot(uid){
 document.getElementById('tabs').addEventListener('click', (e)=>{
   const b = e.target.closest('button[data-tab]'); if(!b) return;
   currentTab = b.dataset.tab;
+  if(currentTab!=='cityhall') unbindStickyHScroll();
   [...document.querySelectorAll('#tabs button')].forEach(x=>x.setAttribute('aria-selected', x===b));
   VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', currentTab!==id));
   renderTab();
@@ -664,6 +696,7 @@ function critHelp(summary, dlHtml){
 function gotoCustomersByStatus(status){
   custStatusFilter = status;
   currentTab = 'customers';
+  unbindStickyHScroll();
   document.querySelectorAll('#tabs button[data-tab]').forEach(x=> x.setAttribute('aria-selected', String(x.dataset.tab==='customers')));
   VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', id!=='customers'));
   renderTab();
@@ -673,6 +706,7 @@ function gotoCustomersByQuery(name){
   custQuery = name;
   custStatusFilter = '전체';
   currentTab = 'customers';
+  unbindStickyHScroll();
   document.querySelectorAll('#tabs button[data-tab]').forEach(x=> x.setAttribute('aria-selected', String(x.dataset.tab==='customers')));
   VIEW_IDS.forEach(id=> document.getElementById('view-'+id).classList.toggle('hide', id!=='customers'));
   renderTab();
@@ -1086,7 +1120,8 @@ async function ensureCityHallLoaded(){
 function filteredCityHall(){
   let list = CITYHALL;
   if(chBuilding!=='전체') list = list.filter(r=>r.building===chBuilding);
-  if(chStatus!=='전체') list = list.filter(r=>r.status===chStatus);
+  if(chStatus==='__opp__') list = list.filter(r=> r.status.startsWith('영업기회'));
+  else if(chStatus!=='전체') list = list.filter(r=>r.status===chStatus);
   const q = chQuery.trim().toLowerCase();
   if(q) list = list.filter(r=> (r.dept_name||'').toLowerCase().includes(q) || (r.customer_name||'').toLowerCase().includes(q) || (r.building||'').toLowerCase().includes(q));
   return list;
@@ -1112,12 +1147,12 @@ async function renderCityHallView(){
         <span class="note">공식 청사안내(seoul.go.kr) 기준 ${num(total)}개 부서 · 현장조사 2026.7~8</span>
       </div>
       <div class="kpis">
-        <div class="kpi"><div class="l">확보</div><div class="v">${num(secureN)}</div><div class="s">주문이력 있음</div></div>
-        <div class="kpi"><div class="l">영업기회 · 우회구매</div><div class="v">${num(bypassN)}</div><div class="s">생산시설 직접거래 확인됨</div></div>
-        <div class="kpi"><div class="l">영업기회 · 미참여</div><div class="v">${num(commercialN)}</div><div class="s">일반업체 사용 추정</div></div>
-        <div class="kpi"><div class="l">미확인</div><div class="v">${num(unknownN)}</div><div class="s">향후 조사 대상</div></div>
+        <div class="kpi click" data-status="확보(주문이력 있음)"><div class="l">확보</div><div class="v">${num(secureN)}</div><div class="s">주문이력 있음</div></div>
+        <div class="kpi click" data-status="영업기회(생산시설 직접거래-우회구매)"><div class="l">🎯 영업기회 · 우회구매</div><div class="v">${num(bypassN)}</div><div class="s">직접 주문하는데, 우리를 거치지 않음</div></div>
+        <div class="kpi click" data-status="영업기회(우선구매 미참여 추정)"><div class="l">🎯 영업기회 · 미참여</div><div class="v">${num(commercialN)}</div><div class="s">우리가 제공 안 하는 일반업체 사용</div></div>
+        <div class="kpi click" data-status="미확인"><div class="l">미확인</div><div class="v">${num(unknownN)}</div><div class="s">향후 조사 대상</div></div>
       </div>
-      <p class="explain">우회구매는 현장조사에서 확인된 공급업체가 우리와 거래하는 생산시설(치즈·갑을·꿈드래·그린내·나눔·SD·리드릭 등)인데, 그 부서·품목은 우리를 거치지 않고 생산시설에 직접 주문 중인 것으로 확인된 곳이에요 — 전환 가능성이 가장 높은 타깃입니다. 미참여는 더블A·후지필름 등 일반 상업 브랜드를 쓰고 있어 우선구매 제도 안내부터 필요한 곳이에요.</p>
+      <p class="explain"><b>영업기회 · 우회구매</b>는 현장조사에서 확인된 공급업체가 우리와 거래하는 생산시설(치즈·갑을·꿈드래·그린내·나눔·SD·리드릭 등)인데, 그 부서·품목은 우리를 거치지 않고 생산시설에 직접 주문 중인 것으로 확인된 곳이에요 — 우리 쪽으로 전환 가능성이 가장 높은 타깃입니다. <b>영업기회 · 미참여</b>는 더블A·후지필름 등 우리가 취급하지 않는 일반 상업 브랜드를 쓰고 있어, 장애인생산품 우선구매 제도 자체를 안내하는 게 먼저 필요한 곳이에요. KPI 카드를 누르면 해당 상태만 걸러서 볼 수 있어요.</p>
       <div class="filters" style="margin-top:12px">
         <input type="search" id="chq" placeholder="부서명, 거래처명, 건물로 검색" value="${esc(chQuery)}">
         <select id="chBuildingSel">
@@ -1125,12 +1160,23 @@ async function renderCityHallView(){
           ${CH_BUILDING_ORDER.filter(b=>CITYHALL.some(r=>r.building===b)).map(b=>`<option ${chBuilding===b?'selected':''}>${esc(b)}</option>`).join('')}
         </select>
         <select id="chStatusSel">
-          ${CH_STATUS_ORDER.map(s=>`<option value="${esc(s)}" ${chStatus===s?'selected':''}>${s==='전체'?'전체 상태':(CH_STATUS_SHORT[s]||s)}</option>`).join('')}
+          <option value="전체" ${chStatus==='전체'?'selected':''}>전체 상태</option>
+          <option value="__opp__" ${chStatus==='__opp__'?'selected':''}>🎯 영업기회만 (${num(bypassN+commercialN)})</option>
+          ${CH_STATUS_ORDER.filter(s=>s!=='전체').map(s=>`<option value="${esc(s)}" ${chStatus===s?'selected':''}>${CH_STATUS_SHORT[s]||s}</option>`).join('')}
         </select>
         <button class="btn" id="chcopyall">목록 복사</button>
       </div>
       <div id="chResult" style="margin-top:12px"></div>
     </div>`;
+
+  el.querySelectorAll('.kpi[data-status]').forEach(k=>{
+    k.onclick = ()=>{
+      chStatus = k.dataset.status;
+      const sel = document.getElementById('chStatusSel'); if(sel) sel.value = chStatus;
+      draw();
+      document.getElementById('chResult').scrollIntoView({behavior:'smooth', block:'start'});
+    };
+  });
 
   function draw(){
     const list = filteredCityHall();
@@ -1155,6 +1201,8 @@ async function renderCityHallView(){
     document.getElementById('chResult').querySelectorAll('[data-cust]').forEach(btn=>{
       btn.onclick = ()=> openDrawer(Number(btn.dataset.cust));
     });
+    const wrapEl = document.getElementById('chResult').querySelector('.tbl-wrap');
+    if(wrapEl) bindStickyHScroll(wrapEl);
   }
   document.getElementById('chq').oninput = (e)=>{ chQuery = e.target.value; draw(); };
   document.getElementById('chBuildingSel').onchange = (e)=>{ chBuilding = e.target.value; draw(); };
